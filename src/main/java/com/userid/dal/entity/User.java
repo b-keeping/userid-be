@@ -21,6 +21,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 
 @Entity
 @Table(
@@ -56,7 +57,8 @@ public class User {
   private OffsetDateTime createdAt;
 
   @Builder.Default
-  @Column(name = "profile_jsonb", columnDefinition = "jsonb not null default '{}'::jsonb")
+  @Column(name = "profile_jsonb", nullable = false, columnDefinition = "jsonb")
+  @ColumnDefault("'{}'::jsonb")
   private String profileJsonb = "{}";
 
   @Builder.Default
