@@ -9,9 +9,7 @@ spring:
     properties:
       hibernate:
         format_sql: true
-  jackson:
-    serialization:
-      WRITE_DATES_AS_TIMESTAMPS: false
+  jackson: {}
 
 server:
   port: ${AUTH_PORT:8282}
