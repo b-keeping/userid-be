@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: ${AUTH_DB_URL:jdbc:postgresql://localhost:5432/userid}
+    username: ${AUTH_DB_USER:userid}
+    password: ${AUTH_DB_PASSWORD:userid}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+server:
+  port: ${AUTH_PORT:8282}
+
+auth:
+  jwt:
+    secret: ${AUTH_JWT_SECRET:change-me-please-change-me-please-change-me-32bytes}
+    expiration-minutes: ${AUTH_JWT_EXP_MINUTES:60}
