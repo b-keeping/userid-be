@@ -56,6 +56,10 @@ public class User {
   private OffsetDateTime createdAt;
 
   @Builder.Default
+  @Column(name = "profile_jsonb", columnDefinition = "jsonb not null default '{}'::jsonb")
+  private String profileJsonb = "{}";
+
+  @Builder.Default
   @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
   private Set<UserProfileValue> values = new HashSet<>();
 }

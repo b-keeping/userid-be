@@ -28,6 +28,7 @@ erDiagram
     varchar login
     varchar email
     timestamptz created_at
+    jsonb profile_jsonb
   }
 
   service_users {
@@ -106,5 +107,6 @@ erDiagram
 ## Notes
 - Each profile value row stores a single typed value, enforced in service validation.
 - Search is implemented as `EXISTS` subqueries per filter to use `field_id + value_*` indexes.
+- `users.profile_jsonb` stores a denormalized snapshot of profile values and is used for user fetch responses.
 - Requests must include `Authorization: Bearer <JWT>` for access checks (admin vs domain-linked user).
 - Default auth service port: `8282` (override with `AUTH_PORT`).

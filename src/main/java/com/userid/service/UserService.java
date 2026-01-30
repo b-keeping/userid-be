@@ -7,6 +7,8 @@ import com.userid.api.user.UserRegistrationRequest;
 import com.userid.api.user.UserResponse;
 import com.userid.api.user.UserSearchRequest;
 import com.userid.api.user.UserUpdateRequest;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.userid.dal.entity.Domain;
 import com.userid.dal.entity.FieldType;
 import com.userid.dal.entity.ProfileField;
@@ -37,6 +39,7 @@ public class UserService {
   private final ProfileFieldRepository profileFieldRepository;
   private final UserRepository userRepository;
   private final AccessService accessService;
+  private final ObjectMapper objectMapper;
 
   public UserResponse register(Long serviceUserId, Long domainId, UserRegistrationRequest request) {
     accessService.requireDomainAccess(serviceUserId, domainId);
@@ -95,6 +98,8 @@ public class UserService {
       value.setUser(user);
       user.getValues().add(value);
     }
+
+    user.setProfileJsonb(serializeProfile(values));
 
     User saved = userRepository.save(user);
     return toResponse(saved);
@@ -196,6 +201,8 @@ public class UserService {
         value.setUser(user);
         user.getValues().add(value);
       }
+
+      user.setProfileJsonb(serializeProfile(values));
     }
 
     User saved = userRepository.save(user);
@@ -270,12 +277,15 @@ public class UserService {
   }
 
   private UserResponse toResponse(User user) {
-    List<UserProfileValueResponse> values = user.getValues().stream()
-        .sorted(Comparator
-            .comparing((UserProfileValue v) -> v.getField().getSortOrder(), Comparator.nullsLast(Integer::compareTo))
-            .thenComparing(v -> v.getField().getId()))
-        .map(this::toResponse)
-        .collect(Collectors.toList());
+    List<UserProfileValueResponse> values = parseProfile(user.getProfileJsonb());
+    if (values == null) {
+      values = user.getValues().stream()
+          .sorted(Comparator
+              .comparing((UserProfileValue v) -> v.getField().getSortOrder(), Comparator.nullsLast(Integer::compareTo))
+              .thenComparing(v -> v.getField().getId()))
+          .map(this::toResponse)
+          .collect(Collectors.toList());
+    }
 
     return new UserResponse(user.getId(), user.getLogin(), user.getEmail(), user.getCreatedAt(), values);
   }
@@ -305,5 +315,30 @@ public class UserService {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing value for " + name);
     }
     return value;
+  }
+
+  private String serializeProfile(List<UserProfileValue> values) {
+    List<UserProfileValueResponse> snapshot = values.stream()
+        .sorted(Comparator
+            .comparing((UserProfileValue v) -> v.getField().getSortOrder(), Comparator.nullsLast(Integer::compareTo))
+            .thenComparing(v -> v.getField().getId()))
+        .map(this::toResponse)
+        .collect(Collectors.toList());
+    try {
+      return objectMapper.writeValueAsString(snapshot);
+    } catch (Exception ex) {
+      throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to build profile snapshot");
+    }
+  }
+
+  private List<UserProfileValueResponse> parseProfile(String json) {
+    if (json == null || json.isBlank() || "{}".equals(json)) {
+      return List.of();
+    }
+    try {
+      return objectMapper.readValue(json, new TypeReference<List<UserProfileValueResponse>>() {});
+    } catch (Exception ex) {
+      return null;
+    }
   }
 }

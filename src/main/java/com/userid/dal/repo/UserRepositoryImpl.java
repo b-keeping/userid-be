@@ -30,9 +30,6 @@ public class UserRepositoryImpl implements UserRepositoryCustom {
     CriteriaQuery<User> cq = cb.createQuery(User.class);
     Root<User> userRoot = cq.from(User.class);
 
-    Fetch<User, UserProfileValue> valuesFetch = userRoot.fetch("values", JoinType.LEFT);
-    valuesFetch.fetch("field", JoinType.LEFT);
-
     List<Predicate> predicates = new ArrayList<>();
     predicates.add(cb.equal(userRoot.get("domain").get("id"), domainId));
 
