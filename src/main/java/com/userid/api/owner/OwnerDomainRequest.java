@@ -1,7 +1,7 @@
-package com.userid.api.serviceuser;
+package com.userid.api.owner;
 
 import jakarta.validation.constraints.NotNull;
 
-public record ServiceUserDomainRequest(
+public record OwnerDomainRequest(
     @NotNull Long domainId
 ) {}

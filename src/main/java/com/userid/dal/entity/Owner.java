@@ -23,12 +23,12 @@ import lombok.Setter;
 
 @Entity
 @Table(
-    name = "service_users",
+    name = "owners",
     uniqueConstraints = {
-      @UniqueConstraint(name = "uk_service_users_username", columnNames = {"username"})
+      @UniqueConstraint(name = "uk_owners_username", columnNames = {"username"})
     },
     indexes = {
-      @Index(name = "idx_service_users_role", columnList = "role")
+      @Index(name = "idx_owners_role", columnList = "role")
     }
 )
 @Getter
@@ -36,7 +36,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ServiceUser {
+public class Owner {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
@@ -49,12 +49,12 @@ public class ServiceUser {
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 16)
-  private ServiceUserRole role;
+  private OwnerRole role;
 
   @Column(name = "created_at", nullable = false)
   private OffsetDateTime createdAt;
 
   @Builder.Default
-  @OneToMany(mappedBy = "serviceUser", cascade = CascadeType.ALL, orphanRemoval = true)
-  private Set<ServiceUserDomain> domains = new HashSet<>();
+  @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, orphanRemoval = true)
+  private Set<OwnerDomain> domains = new HashSet<>();
 }

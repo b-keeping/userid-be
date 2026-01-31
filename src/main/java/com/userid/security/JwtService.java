@@ -1,7 +1,7 @@
 package com.userid.security;
 
-import com.userid.dal.entity.ServiceUser;
-import com.userid.dal.entity.ServiceUserRole;
+import com.userid.dal.entity.Owner;
+import com.userid.dal.entity.OwnerRole;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -30,7 +30,7 @@ public class JwtService {
     this.expiration = Duration.ofMinutes(expirationMinutes);
   }
 
-  public String generateToken(ServiceUser user) {
+  public String generateToken(Owner user) {
     Instant now = Instant.now();
     return Jwts.builder()
         .subject(String.valueOf(user.getId()))
@@ -52,7 +52,7 @@ public class JwtService {
     Long id = Long.valueOf(claims.getSubject());
     String username = claims.get("username", String.class);
     String roleValue = claims.get("role", String.class);
-    ServiceUserRole role = ServiceUserRole.valueOf(roleValue);
+    OwnerRole role = OwnerRole.valueOf(roleValue);
     return new AuthPrincipal(id, username, role);
   }
 }

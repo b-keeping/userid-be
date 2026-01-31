@@ -20,13 +20,14 @@ import lombok.Setter;
 
 @Entity
 @Table(
-    name = "service_user_domains",
+    name = "owner_domains",
     uniqueConstraints = {
-      @UniqueConstraint(name = "uk_service_user_domains_user_domain", columnNames = {"service_user_id", "domain_id"})
+      @UniqueConstraint(name = "uk_owner_domains_owner_domain", columnNames = {"owner_id", "domain_id"}),
+      @UniqueConstraint(name = "uk_owner_domains_domain", columnNames = {"domain_id"})
     },
     indexes = {
-      @Index(name = "idx_service_user_domains_user", columnList = "service_user_id"),
-      @Index(name = "idx_service_user_domains_domain", columnList = "domain_id")
+      @Index(name = "idx_owner_domains_owner", columnList = "owner_id"),
+      @Index(name = "idx_owner_domains_domain", columnList = "domain_id")
     }
 )
 @Getter
@@ -34,14 +35,14 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ServiceUserDomain {
+public class OwnerDomain {
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "service_user_id", nullable = false)
-  private ServiceUser serviceUser;
+  @JoinColumn(name = "owner_id", nullable = false)
+  private Owner owner;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "domain_id", nullable = false)

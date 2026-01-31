@@ -1,8 +1,8 @@
 package com.userid.api.auth;
 
-import com.userid.api.serviceuser.ServiceUserResponse;
+import com.userid.api.owner.OwnerResponse;
 
 public record ServiceLoginResponse(
     String token,
-    ServiceUserResponse user
+    OwnerResponse user
 ) {}

@@ -1,13 +1,13 @@
-package com.userid.api.serviceuser;
+package com.userid.api.owner;
 
-import com.userid.dal.entity.ServiceUserRole;
+import com.userid.dal.entity.OwnerRole;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
 
-public record ServiceUserRequest(
+public record OwnerRequest(
     @NotBlank String username,
     String password,
-    @NotNull ServiceUserRole role,
+    @NotNull OwnerRole role,
     List<Long> domainIds
 ) {}

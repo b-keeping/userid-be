@@ -1,9 +1,9 @@
 package com.userid.service;
 
-import com.userid.dal.entity.ServiceUser;
-import com.userid.dal.entity.ServiceUserRole;
-import com.userid.dal.repo.ServiceUserDomainRepository;
-import com.userid.dal.repo.ServiceUserRepository;
+import com.userid.dal.entity.Owner;
+import com.userid.dal.entity.OwnerRole;
+import com.userid.dal.repo.OwnerDomainRepository;
+import com.userid.dal.repo.OwnerRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -12,40 +12,40 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 @RequiredArgsConstructor
 public class AccessService {
-  private final ServiceUserRepository serviceUserRepository;
-  private final ServiceUserDomainRepository serviceUserDomainRepository;
+  private final OwnerRepository ownerRepository;
+  private final OwnerDomainRepository ownerDomainRepository;
 
-  public ServiceUser requireUser(Long serviceUserId) {
-    if (serviceUserId == null) {
-      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing service user id");
+  public Owner requireUser(Long ownerId) {
+    if (ownerId == null) {
+      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing owner id");
     }
-    return serviceUserRepository.findById(serviceUserId)
-        .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Service user not found"));
+    return ownerRepository.findById(ownerId)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Owner not found"));
   }
 
-  public ServiceUser requireAdmin(Long serviceUserId) {
-    ServiceUser user = requireUser(serviceUserId);
-    if (user.getRole() != ServiceUserRole.ADMIN) {
+  public Owner requireAdmin(Long ownerId) {
+    Owner user = requireUser(ownerId);
+    if (user.getRole() != OwnerRole.ADMIN) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin access required");
     }
     return user;
   }
 
-  public ServiceUser requireDomainAccess(Long serviceUserId, Long domainId) {
-    ServiceUser user = requireUser(serviceUserId);
-    if (user.getRole() == ServiceUserRole.ADMIN) {
+  public Owner requireDomainAccess(Long ownerId, Long domainId) {
+    Owner user = requireUser(ownerId);
+    if (user.getRole() == OwnerRole.ADMIN) {
       return user;
     }
-    boolean hasAccess = serviceUserDomainRepository.existsByServiceUserIdAndDomainId(serviceUserId, domainId);
+    boolean hasAccess = ownerDomainRepository.existsByOwnerIdAndDomainId(ownerId, domainId);
     if (!hasAccess) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No access to domain");
     }
     return user;
   }
 
-  public java.util.List<Long> domainIds(Long serviceUserId) {
-    requireUser(serviceUserId);
-    return serviceUserDomainRepository.findByServiceUserId(serviceUserId).stream()
+  public java.util.List<Long> domainIds(Long ownerId) {
+    requireUser(ownerId);
+    return ownerDomainRepository.findByOwnerId(ownerId).stream()
         .map(link -> link.getDomain().getId())
         .distinct()
         .toList();

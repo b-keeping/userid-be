@@ -1,6 +1,6 @@
 package com.userid.dal.entity;
 
-public enum ServiceUserRole {
+public enum OwnerRole {
   ADMIN,
   USER
 }
