@@ -1,6 +1,6 @@
 package com.userid.api.auth;
 
-import com.userid.service.ServiceAuthService;
+import com.userid.service.OwnerAuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -11,11 +11,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
-public class ServiceAuthController {
-  private final ServiceAuthService serviceAuthService;
+public class OwnerAuthController {
+  private final OwnerAuthService ownerAuthService;
 
   @PostMapping("/login")
-  public ServiceLoginResponse login(@Valid @RequestBody ServiceLoginRequest request) {
-    return serviceAuthService.login(request);
+  public OwnerLoginResponse login(@Valid @RequestBody OwnerLoginRequest request) {
+    return ownerAuthService.login(request);
   }
 }

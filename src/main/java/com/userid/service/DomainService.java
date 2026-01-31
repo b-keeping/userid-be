@@ -35,11 +35,11 @@ public class DomainService {
 
     Owner owner = null;
     if (requester.getRole() == OwnerRole.ADMIN) {
-      Long ownerId = request.ownerId();
-      if (ownerId == null) {
+      Long targetOwnerId = request.ownerId();
+      if (targetOwnerId == null) {
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Owner is required for admin");
       }
-      owner = ownerRepository.findById(ownerId)
+      owner = ownerRepository.findById(targetOwnerId)
           .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Owner not found"));
       if (owner.getRole() != OwnerRole.USER) {
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Owner must be USER");

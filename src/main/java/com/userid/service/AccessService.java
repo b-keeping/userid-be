@@ -4,6 +4,7 @@ import com.userid.dal.entity.Owner;
 import com.userid.dal.entity.OwnerRole;
 import com.userid.dal.repo.OwnerDomainRepository;
 import com.userid.dal.repo.OwnerRepository;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -48,6 +49,6 @@ public class AccessService {
     return ownerDomainRepository.findByOwnerId(ownerId).stream()
         .map(link -> link.getDomain().getId())
         .distinct()
-        .toList();
+        .collect(Collectors.toList());
   }
 }

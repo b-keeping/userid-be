@@ -214,7 +214,7 @@ public class OwnerService {
       domainIds = ownerDomainRepository.findByOwnerId(user.getId()).stream()
           .map(link -> link.getDomain().getId())
           .distinct()
-          .toList();
+          .collect(Collectors.toList());
     }
 
     return new OwnerResponse(
@@ -230,7 +230,7 @@ public class OwnerService {
     return ownerDomainRepository.findByOwnerId(userId).stream()
         .map(link -> link.getDomain().getId())
         .distinct()
-        .toList();
+        .collect(Collectors.toList());
   }
 
   private void ensureDomainsHaveOtherOwners(Long userId, List<Long> domainIds) {
