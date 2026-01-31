@@ -8,6 +8,7 @@ import com.userid.api.user.UserResponse;
 import com.userid.api.user.UserSearchRequest;
 import com.userid.api.user.UserUpdateRequest;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.userid.dal.entity.Domain;
 import com.userid.dal.entity.FieldType;
@@ -328,26 +329,28 @@ public class UserService {
     return password;
   }
 
-  private String serializeProfile(List<UserProfileValue> values) {
+  private JsonNode serializeProfile(List<UserProfileValue> values) {
     List<UserProfileValueResponse> snapshot = values.stream()
         .sorted(Comparator
             .comparing((UserProfileValue v) -> v.getField().getSortOrder(), Comparator.nullsLast(Integer::compareTo))
             .thenComparing(v -> v.getField().getId()))
         .map(this::toResponse)
         .collect(Collectors.toList());
-    try {
-      return objectMapper.writeValueAsString(snapshot);
-    } catch (Exception ex) {
-      throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to build profile snapshot");
-    }
+    return objectMapper.valueToTree(snapshot);
   }
 
-  private List<UserProfileValueResponse> parseProfile(String json) {
-    if (json == null || json.isBlank() || "{}".equals(json)) {
+  private List<UserProfileValueResponse> parseProfile(JsonNode json) {
+    if (json == null || json.isNull() || json.isMissingNode()) {
       return List.of();
     }
+    if (json.isObject() && json.isEmpty()) {
+      return List.of();
+    }
+    if (!json.isArray()) {
+      return null;
+    }
     try {
-      return objectMapper.readValue(json, new TypeReference<List<UserProfileValueResponse>>() {});
+      return objectMapper.convertValue(json, new TypeReference<List<UserProfileValueResponse>>() {});
     } catch (Exception ex) {
       return null;
     }
