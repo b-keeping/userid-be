@@ -14,6 +14,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.Set;
@@ -66,7 +67,7 @@ public class User {
   @Column(name = "profile_jsonb", nullable = false, columnDefinition = "jsonb")
   @JdbcTypeCode(SqlTypes.JSON)
   @ColumnDefault("'{}'::jsonb")
-  private JsonNode profileJsonb;
+  private JsonNode profileJsonb = JsonNodeFactory.instance.objectNode();
 
   @Builder.Default
   @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
