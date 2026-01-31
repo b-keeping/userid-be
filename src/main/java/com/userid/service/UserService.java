@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -40,6 +41,7 @@ public class UserService {
   private final UserRepository userRepository;
   private final AccessService accessService;
   private final ObjectMapper objectMapper;
+  private final PasswordEncoder passwordEncoder;
 
   public UserResponse register(Long serviceUserId, Long domainId, UserRegistrationRequest request) {
     accessService.requireDomainAccess(serviceUserId, domainId);
@@ -90,6 +92,7 @@ public class UserService {
         .domain(domain)
         .login(request.login())
         .email(request.email())
+        .passwordHash(passwordEncoder.encode(requirePassword(request.password())))
         .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
         .build();
 
@@ -151,6 +154,9 @@ public class UserService {
         throw new ResponseStatusException(HttpStatus.CONFLICT, "Login already exists in domain");
       }
       user.setLogin(request.login());
+    }
+    if (request.password() != null && !request.password().isBlank()) {
+      user.setPasswordHash(passwordEncoder.encode(request.password()));
     }
     if (request.email() != null) {
       user.setEmail(request.email());
@@ -313,6 +319,13 @@ public class UserService {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing value for " + name);
     }
     return value;
+  }
+
+  private static String requirePassword(String password) {
+    if (password == null || password.isBlank()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password is required");
+    }
+    return password;
   }
 
   private String serializeProfile(List<UserProfileValue> values) {

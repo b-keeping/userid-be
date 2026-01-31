@@ -5,6 +5,7 @@ import java.util.List;
 
 public record UserRegistrationRequest(
     @NotBlank String login,
+    @NotBlank String password,
     String email,
     List<UserProfileValueRequest> values
 ) {}

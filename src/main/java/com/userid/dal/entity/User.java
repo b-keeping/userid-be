@@ -53,6 +53,9 @@ public class User {
   @Column(length = 255)
   private String email;
 
+  @Column(name = "password_hash", nullable = false, length = 255)
+  private String passwordHash;
+
   @Column(name = "created_at", nullable = false)
   private OffsetDateTime createdAt;
 
