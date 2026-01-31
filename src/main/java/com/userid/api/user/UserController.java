@@ -1,5 +1,6 @@
 package com.userid.api.user;
 
+import com.userid.api.common.ApiMessage;
 import com.userid.security.AuthPrincipal;
 import com.userid.service.UserService;
 import jakarta.validation.Valid;
@@ -59,11 +60,12 @@ public class UserController {
   }
 
   @DeleteMapping("/{userId}")
-  public void delete(
+  public ApiMessage delete(
       @AuthenticationPrincipal AuthPrincipal principal,
       @PathVariable Long domainId,
       @PathVariable Long userId
   ) {
     userService.delete(principal.id(), domainId, userId);
+    return new ApiMessage("ok");
   }
 }

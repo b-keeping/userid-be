@@ -1,5 +1,6 @@
 package com.userid.api.domain;
 
+import com.userid.api.common.ApiMessage;
 import com.userid.security.AuthPrincipal;
 import com.userid.service.DomainService;
 import jakarta.validation.Valid;
@@ -46,10 +47,11 @@ public class DomainController {
   }
 
   @DeleteMapping("/{domainId}")
-  public void delete(
+  public ApiMessage delete(
       @AuthenticationPrincipal AuthPrincipal principal,
       @PathVariable Long domainId
   ) {
     domainService.delete(principal.id(), domainId);
+    return new ApiMessage("ok");
   }
 }

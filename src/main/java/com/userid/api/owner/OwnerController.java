@@ -1,5 +1,6 @@
 package com.userid.api.owner;
 
+import com.userid.api.common.ApiMessage;
 import com.userid.security.AuthPrincipal;
 import com.userid.service.OwnerService;
 import jakarta.validation.Valid;
@@ -63,19 +64,21 @@ public class OwnerController {
   }
 
   @DeleteMapping("/{ownerId}/domains/{domainId}")
-  public void removeDomain(
+  public ApiMessage removeDomain(
       @AuthenticationPrincipal AuthPrincipal principal,
       @PathVariable Long ownerId,
       @PathVariable Long domainId
   ) {
     ownerService.removeDomain(principal.id(), ownerId, domainId);
+    return new ApiMessage("ok");
   }
 
   @DeleteMapping("/{ownerId}")
-  public void delete(
+  public ApiMessage delete(
       @AuthenticationPrincipal AuthPrincipal principal,
       @PathVariable Long ownerId
   ) {
     ownerService.delete(principal.id(), ownerId);
+    return new ApiMessage("ok");
   }
 }

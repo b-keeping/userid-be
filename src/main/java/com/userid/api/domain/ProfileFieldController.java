@@ -1,5 +1,6 @@
 package com.userid.api.domain;
 
+import com.userid.api.common.ApiMessage;
 import com.userid.security.AuthPrincipal;
 import com.userid.service.ProfileFieldService;
 import jakarta.validation.Valid;
@@ -49,11 +50,12 @@ public class ProfileFieldController {
   }
 
   @DeleteMapping("/{fieldId}")
-  public void delete(
+  public ApiMessage delete(
       @AuthenticationPrincipal AuthPrincipal principal,
       @PathVariable Long domainId,
       @PathVariable Long fieldId
   ) {
     profileFieldService.delete(principal.id(), domainId, fieldId);
+    return new ApiMessage("ok");
   }
 }
