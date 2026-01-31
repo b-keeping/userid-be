@@ -7,8 +7,8 @@ import java.time.LocalTime;
 import java.time.OffsetDateTime;
 
 public record UserProfileValueResponse(
-    String key,
-    String label,
+    Long fieldId,
+    String name,
     FieldType type,
     boolean mandatory,
     String stringValue,

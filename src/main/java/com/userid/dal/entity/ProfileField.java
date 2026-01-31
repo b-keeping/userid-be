@@ -24,13 +24,13 @@ import lombok.Setter;
     name = "profile_fields",
     uniqueConstraints = {
       @UniqueConstraint(
-          name = "uk_profile_fields_domain_key",
-          columnNames = {"domain_id", "field_key"}
+          name = "uk_profile_fields_domain_name",
+          columnNames = {"domain_id", "name"}
       )
     },
     indexes = {
       @Index(name = "idx_profile_fields_domain", columnList = "domain_id"),
-      @Index(name = "idx_profile_fields_domain_key", columnList = "domain_id,field_key")
+      @Index(name = "idx_profile_fields_domain_name", columnList = "domain_id,name")
     }
 )
 @Getter
@@ -47,11 +47,8 @@ public class ProfileField {
   @JoinColumn(name = "domain_id", nullable = false)
   private Domain domain;
 
-  @Column(name = "field_key", nullable = false, length = 64)
-  private String key;
-
   @Column(nullable = false, length = 255)
-  private String label;
+  private String name;
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 16)

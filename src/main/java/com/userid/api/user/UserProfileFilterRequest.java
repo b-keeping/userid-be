@@ -6,7 +6,7 @@ import java.time.LocalTime;
 import java.time.OffsetDateTime;
 
 public record UserProfileFilterRequest(
-    String key,
+    Long fieldId,
     String stringValue,
     Boolean booleanValue,
     Long integerValue,

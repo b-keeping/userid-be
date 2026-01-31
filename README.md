@@ -14,8 +14,7 @@ erDiagram
   profile_fields {
     bigint id PK
     bigint domain_id FK
-    varchar field_key
-    varchar label
+    varchar name
     varchar type
     boolean mandatory
     int sort_order
@@ -67,7 +66,7 @@ erDiagram
 ```
 
 ### Indexes (core for fast fetch)
-- `profile_fields (domain_id, field_key)` unique for schema lookup by domain.
+- `profile_fields (domain_id, name)` unique for schema lookup by domain.
 - `users (domain_id, login)` unique for user lookup per domain.
 - `user_profile_values (user_id)` for fast fetch of user profile.
 - `user_profile_values (field_id, value_*)` per-type composite indexes for fast filtering.

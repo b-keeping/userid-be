@@ -8,7 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface ProfileFieldRepository extends JpaRepository<ProfileField, Long> {
   List<ProfileField> findByDomainIdOrderBySortOrderAscIdAsc(Long domainId);
 
-  Optional<ProfileField> findByDomainIdAndKey(Long domainId, String key);
+  Optional<ProfileField> findByDomainIdAndName(Long domainId, String name);
 
   List<ProfileField> findByDomainId(Long domainId);
 

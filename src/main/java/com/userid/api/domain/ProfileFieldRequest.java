@@ -5,8 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 public record ProfileFieldRequest(
-    @NotBlank String key,
-    @NotBlank String label,
+    @NotBlank String name,
     @NotNull FieldType type,
     @NotNull Boolean mandatory,
     Integer sortOrder

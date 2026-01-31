@@ -29,15 +29,14 @@ public class ProfileFieldService {
     Domain domain = domainRepository.findById(domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found"));
 
-    profileFieldRepository.findByDomainIdAndKey(domainId, request.key())
+    profileFieldRepository.findByDomainIdAndName(domainId, request.name())
         .ifPresent(field -> {
-          throw new ResponseStatusException(HttpStatus.CONFLICT, "Field key already exists for domain");
+          throw new ResponseStatusException(HttpStatus.CONFLICT, "Field name already exists for domain");
         });
 
     ProfileField field = ProfileField.builder()
         .domain(domain)
-        .key(request.key())
-        .label(request.label())
+        .name(request.name())
         .type(request.type())
         .mandatory(Boolean.TRUE.equals(request.mandatory()))
         .sortOrder(request.sortOrder())
@@ -71,12 +70,12 @@ public class ProfileFieldService {
     ProfileField field = profileFieldRepository.findByIdAndDomainId(fieldId, domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile field not found"));
 
-    if (request.key() != null && !request.key().isBlank() && !request.key().equals(field.getKey())) {
-      profileFieldRepository.findByDomainIdAndKey(domainId, request.key())
+    if (request.name() != null && !request.name().isBlank() && !request.name().equals(field.getName())) {
+      profileFieldRepository.findByDomainIdAndName(domainId, request.name())
           .ifPresent(existing -> {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Field key already exists for domain");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Field name already exists for domain");
           });
-      field.setKey(request.key());
+      field.setName(request.name());
     }
 
     if (request.type() != null && request.type() != field.getType()) {
@@ -90,9 +89,6 @@ public class ProfileFieldService {
       field.setType(request.type());
     }
 
-    if (request.label() != null && !request.label().isBlank()) {
-      field.setLabel(request.label());
-    }
     if (request.mandatory() != null) {
       field.setMandatory(request.mandatory());
     }
@@ -115,8 +111,7 @@ public class ProfileFieldService {
   private ProfileFieldResponse toResponse(ProfileField field) {
     return new ProfileFieldResponse(
         field.getId(),
-        field.getKey(),
-        field.getLabel(),
+        field.getName(),
         field.getType(),
         field.isMandatory(),
         field.getSortOrder()

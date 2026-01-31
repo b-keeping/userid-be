@@ -47,25 +47,25 @@ public class UserService {
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found"));
 
     List<ProfileField> fields = profileFieldRepository.findByDomainId(domainId);
-    Map<String, ProfileField> fieldByKey = toFieldMap(fields);
+    Map<Long, ProfileField> fieldById = toFieldMap(fields);
 
     List<UserProfileValueRequest> valueRequests =
         request.values() == null ? List.of() : request.values();
 
-    Set<String> providedKeys = new HashSet<>();
+    Set<Long> providedFieldIds = new HashSet<>();
     List<UserProfileValue> values = new ArrayList<>();
 
     for (UserProfileValueRequest valueRequest : valueRequests) {
-      String key = valueRequest.key();
-      if (key == null || key.isBlank()) {
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Profile field key is required");
+      Long fieldId = valueRequest.fieldId();
+      if (fieldId == null) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Profile field id is required");
       }
-      ProfileField field = fieldByKey.get(key);
+      ProfileField field = fieldById.get(fieldId);
       if (field == null) {
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown profile field: " + key);
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown profile field id: " + fieldId);
       }
-      if (!providedKeys.add(key)) {
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Duplicate profile field: " + key);
+      if (!providedFieldIds.add(fieldId)) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Duplicate profile field id: " + fieldId);
       }
 
       UserProfileValue value = new UserProfileValue();
@@ -75,9 +75,8 @@ public class UserService {
     }
 
     List<String> missingMandatory = fields.stream()
-        .filter(ProfileField::isMandatory)
-        .map(ProfileField::getKey)
-        .filter(key -> !providedKeys.contains(key))
+        .filter(field -> field.isMandatory() && !providedFieldIds.contains(field.getId()))
+        .map(ProfileField::getName)
         .toList();
 
     if (!missingMandatory.isEmpty()) {
@@ -121,16 +120,16 @@ public class UserService {
         ? List.of()
         : request.filters();
 
-    Map<String, ProfileField> fieldByKey = toFieldMap(profileFieldRepository.findByDomainId(domainId));
+    Map<Long, ProfileField> fieldById = toFieldMap(profileFieldRepository.findByDomainId(domainId));
     List<UserSearchFilter> resolvedFilters = new ArrayList<>();
 
     for (UserProfileFilterRequest filter : filters) {
-      if (filter.key() == null || filter.key().isBlank()) {
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Filter field key is required");
+      if (filter.fieldId() == null) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Filter field id is required");
       }
-      ProfileField field = fieldByKey.get(filter.key());
+      ProfileField field = fieldById.get(filter.fieldId());
       if (field == null) {
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown profile field: " + filter.key());
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown profile field id: " + filter.fieldId());
       }
       resolvedFilters.add(toSearchFilter(field, filter));
     }
@@ -159,22 +158,22 @@ public class UserService {
 
     if (request.values() != null) {
       List<ProfileField> fields = profileFieldRepository.findByDomainId(domainId);
-      Map<String, ProfileField> fieldByKey = toFieldMap(fields);
+      Map<Long, ProfileField> fieldById = toFieldMap(fields);
 
-      Set<String> providedKeys = new HashSet<>();
+      Set<Long> providedFieldIds = new HashSet<>();
       List<UserProfileValue> values = new ArrayList<>();
 
       for (UserProfileValueRequest valueRequest : request.values()) {
-        String key = valueRequest.key();
-        if (key == null || key.isBlank()) {
-          throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Profile field key is required");
+        Long fieldId = valueRequest.fieldId();
+        if (fieldId == null) {
+          throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Profile field id is required");
         }
-        ProfileField field = fieldByKey.get(key);
+        ProfileField field = fieldById.get(fieldId);
         if (field == null) {
-          throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown profile field: " + key);
+          throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown profile field id: " + fieldId);
         }
-        if (!providedKeys.add(key)) {
-          throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Duplicate profile field: " + key);
+        if (!providedFieldIds.add(fieldId)) {
+          throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Duplicate profile field id: " + fieldId);
         }
 
         UserProfileValue value = new UserProfileValue();
@@ -184,9 +183,8 @@ public class UserService {
       }
 
       List<String> missingMandatory = fields.stream()
-          .filter(ProfileField::isMandatory)
-          .map(ProfileField::getKey)
-          .filter(key -> !providedKeys.contains(key))
+          .filter(field -> field.isMandatory() && !providedFieldIds.contains(field.getId()))
+          .map(ProfileField::getName)
           .toList();
 
       if (!missingMandatory.isEmpty()) {
@@ -216,12 +214,12 @@ public class UserService {
     userRepository.delete(user);
   }
 
-  private Map<String, ProfileField> toFieldMap(List<ProfileField> fields) {
-    Map<String, ProfileField> fieldByKey = new HashMap<>();
+  private Map<Long, ProfileField> toFieldMap(List<ProfileField> fields) {
+    Map<Long, ProfileField> fieldById = new HashMap<>();
     for (ProfileField field : fields) {
-      fieldByKey.put(field.getKey(), field);
+      fieldById.put(field.getId(), field);
     }
-    return fieldByKey;
+    return fieldById;
   }
 
   private void applyValue(UserProfileValue value, FieldType type, UserProfileValueRequest request) {
@@ -293,8 +291,8 @@ public class UserService {
   private UserProfileValueResponse toResponse(UserProfileValue value) {
     ProfileField field = value.getField();
     return new UserProfileValueResponse(
-        field.getKey(),
-        field.getLabel(),
+        field.getId(),
+        field.getName(),
         field.getType(),
         field.isMandatory(),
         value.getValueString(),
