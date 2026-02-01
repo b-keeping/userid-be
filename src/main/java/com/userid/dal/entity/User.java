@@ -31,7 +31,7 @@ import org.hibernate.type.SqlTypes;
 @Table(
     name = "users",
     uniqueConstraints = {
-      @UniqueConstraint(name = "uk_users_domain_login", columnNames = {"domain_id", "login"})
+      @UniqueConstraint(name = "uk_users_domain_email", columnNames = {"domain_id", "email"})
     },
     indexes = {
       @Index(name = "idx_users_domain", columnList = "domain_id")
@@ -51,10 +51,7 @@ public class User {
   @JoinColumn(name = "domain_id", nullable = false)
   private Domain domain;
 
-  @Column(nullable = false, length = 128)
-  private String login;
-
-  @Column(length = 255)
+  @Column(nullable = false, length = 255)
   private String email;
 
   @Column(name = "password_hash", nullable = false, length = 255)

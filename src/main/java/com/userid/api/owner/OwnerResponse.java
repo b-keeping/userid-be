@@ -6,7 +6,7 @@ import java.util.List;
 
 public record OwnerResponse(
     Long id,
-    String username,
+    String email,
     OwnerRole role,
     OffsetDateTime createdAt,
     List<Long> domainIds

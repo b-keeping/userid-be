@@ -20,12 +20,13 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 
 @Entity
 @Table(
     name = "owners",
     uniqueConstraints = {
-      @UniqueConstraint(name = "uk_owners_username", columnNames = {"username"})
+      @UniqueConstraint(name = "uk_owners_email", columnNames = {"email"})
     },
     indexes = {
       @Index(name = "idx_owners_role", columnList = "role")
@@ -41,11 +42,31 @@ public class Owner {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  @Column(nullable = false, length = 128)
-  private String username;
+  @Column(nullable = false, length = 255)
+  private String email;
 
   @Column(name = "password_hash", length = 255)
   private String passwordHash;
+
+  @Builder.Default
+  @Column(name = "active", nullable = false)
+  @ColumnDefault("false")
+  private boolean active = false;
+
+  @Column(name = "email_verified_at")
+  private OffsetDateTime emailVerifiedAt;
+
+  @Column(name = "verification_token", length = 80)
+  private String verificationToken;
+
+  @Column(name = "verification_expires_at")
+  private OffsetDateTime verificationExpiresAt;
+
+  @Column(name = "reset_token", length = 80)
+  private String resetToken;
+
+  @Column(name = "reset_expires_at")
+  private OffsetDateTime resetExpiresAt;
 
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 16)

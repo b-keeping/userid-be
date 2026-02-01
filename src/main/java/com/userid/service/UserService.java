@@ -89,9 +89,12 @@ public class UserService {
       );
     }
 
+    if (userRepository.existsByDomainIdAndEmail(domainId, request.email())) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists in domain");
+    }
+
     User user = User.builder()
         .domain(domain)
-        .login(request.login())
         .email(request.email())
         .passwordHash(passwordEncoder.encode(requirePassword(request.password())))
         .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
@@ -149,17 +152,14 @@ public class UserService {
     User user = userRepository.findByIdAndDomainId(userId, domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
-    if (request.login() != null && !request.login().isBlank()) {
-      if (!request.login().equals(user.getLogin())
-          && userRepository.existsByDomainIdAndLogin(domainId, request.login())) {
-        throw new ResponseStatusException(HttpStatus.CONFLICT, "Login already exists in domain");
-      }
-      user.setLogin(request.login());
-    }
     if (request.password() != null && !request.password().isBlank()) {
       user.setPasswordHash(passwordEncoder.encode(request.password()));
     }
-    if (request.email() != null) {
+    if (request.email() != null && !request.email().isBlank()) {
+      if (!request.email().equals(user.getEmail())
+          && userRepository.existsByDomainIdAndEmail(domainId, request.email())) {
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists in domain");
+      }
       user.setEmail(request.email());
     }
 
@@ -292,7 +292,7 @@ public class UserService {
           .collect(Collectors.toList());
     }
 
-    return new UserResponse(user.getId(), user.getLogin(), user.getEmail(), user.getCreatedAt(), values);
+    return new UserResponse(user.getId(), user.getEmail(), user.getCreatedAt(), values);
   }
 
   private UserProfileValueResponse toResponse(UserProfileValue value) {

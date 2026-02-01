@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class AdminSeeder implements CommandLineRunner {
-  private static final String DEFAULT_ADMIN_USERNAME = "admin";
+  private static final String DEFAULT_ADMIN_EMAIL = "admin@userid.local";
   private static final String DEFAULT_ADMIN_PASSWORD = "123456";
 
   private final OwnerRepository ownerRepository;
@@ -21,15 +21,31 @@ public class AdminSeeder implements CommandLineRunner {
 
   @Override
   public void run(String... args) {
-    if (ownerRepository.existsByRole(OwnerRole.ADMIN)) {
+    Owner existing = ownerRepository.findFirstByRole(OwnerRole.ADMIN).orElse(null);
+    if (existing != null) {
+      boolean changed = false;
+      if (existing.getEmail() == null || existing.getEmail().isBlank()) {
+        existing.setEmail(DEFAULT_ADMIN_EMAIL);
+        changed = true;
+      }
+      if (!existing.isActive()) {
+        existing.setActive(true);
+        existing.setEmailVerifiedAt(OffsetDateTime.now(ZoneOffset.UTC));
+        changed = true;
+      }
+      if (changed) {
+        ownerRepository.save(existing);
+      }
       return;
     }
 
     Owner admin = Owner.builder()
-        .username(DEFAULT_ADMIN_USERNAME)
+        .email(DEFAULT_ADMIN_EMAIL)
         .passwordHash(passwordEncoder.encode(DEFAULT_ADMIN_PASSWORD))
         .role(OwnerRole.ADMIN)
         .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
+        .active(true)
+        .emailVerifiedAt(OffsetDateTime.now(ZoneOffset.UTC))
         .build();
 
     ownerRepository.save(admin);

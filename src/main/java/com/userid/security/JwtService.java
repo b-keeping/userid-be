@@ -35,7 +35,7 @@ public class JwtService {
     return Jwts.builder()
         .subject(String.valueOf(user.getId()))
         .claim("role", user.getRole().name())
-        .claim("username", user.getUsername())
+        .claim("email", user.getEmail())
         .issuedAt(Date.from(now))
         .expiration(Date.from(now.plus(expiration)))
         .signWith(secretKey)
@@ -50,9 +50,9 @@ public class JwtService {
         .getPayload();
 
     Long id = Long.valueOf(claims.getSubject());
-    String username = claims.get("username", String.class);
+    String email = claims.get("email", String.class);
     String roleValue = claims.get("role", String.class);
     OwnerRole role = OwnerRole.valueOf(roleValue);
-    return new AuthPrincipal(id, username, role);
+    return new AuthPrincipal(id, email, role);
   }
 }

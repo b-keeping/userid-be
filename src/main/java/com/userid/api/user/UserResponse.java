@@ -5,7 +5,6 @@ import java.util.List;
 
 public record UserResponse(
     Long id,
-    String login,
     String email,
     OffsetDateTime createdAt,
     List<UserProfileValueResponse> values

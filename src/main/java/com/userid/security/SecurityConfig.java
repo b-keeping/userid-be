@@ -23,6 +23,10 @@ public class SecurityConfig {
         .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(auth -> auth
             .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
+            .requestMatchers(HttpMethod.POST, "/api/auth/register").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/auth/confirm").permitAll()
+            .requestMatchers(HttpMethod.POST, "/api/auth/forgot-password").permitAll()
+            .requestMatchers(HttpMethod.POST, "/api/auth/reset-password").permitAll()
             .anyRequest().authenticated()
         )
         .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

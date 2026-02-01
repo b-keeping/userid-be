@@ -3,6 +3,17 @@ spring:
     url: ${AUTH_DB_URL:jdbc:postgresql://localhost:5432/userid}
     username: ${AUTH_DB_USER:userid}
     password: ${AUTH_DB_PASSWORD:userid}
+  mail:
+    host: ${AUTH_SMTP_HOST:}
+    port: ${AUTH_SMTP_PORT:587}
+    username: ${AUTH_SMTP_USER:}
+    password: ${AUTH_SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${AUTH_SMTP_AUTH:true}
+          starttls:
+            enable: ${AUTH_SMTP_STARTTLS:true}
   jpa:
     hibernate:
       ddl-auto: update
@@ -18,3 +29,9 @@ auth:
   jwt:
     secret: ${AUTH_JWT_SECRET:change-me-please-change-me-please-change-me-32bytes}
     expiration-minutes: ${AUTH_JWT_EXP_MINUTES:60}
+  email:
+    from: ${AUTH_EMAIL_FROM:no-reply@userid.local}
+    verify-base-url: ${AUTH_VERIFY_BASE_URL:https://userid.koshsystems.com/verify}
+    reset-base-url: ${AUTH_RESET_BASE_URL:https://userid.koshsystems.com/reset}
+    verification-hours: ${AUTH_VERIFY_HOURS:24}
+    reset-hours: ${AUTH_RESET_HOURS:2}

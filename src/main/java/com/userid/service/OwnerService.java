@@ -36,9 +36,9 @@ public class OwnerService {
   public OwnerResponse create(Long ownerId, OwnerRequest request) {
     accessService.requireAdmin(ownerId);
 
-    ownerRepository.findByUsername(request.username())
+    ownerRepository.findByEmail(request.email())
         .ifPresent(user -> {
-          throw new ResponseStatusException(HttpStatus.CONFLICT, "Username already exists");
+          throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists");
         });
 
     List<Long> domainIds = request.domainIds() == null ? List.of() : request.domainIds();
@@ -50,10 +50,12 @@ public class OwnerService {
     String password = requirePassword(request.password());
 
     Owner user = Owner.builder()
-        .username(request.username())
+        .email(request.email())
         .passwordHash(passwordEncoder.encode(password))
         .role(request.role())
         .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
+        .active(true)
+        .emailVerifiedAt(OffsetDateTime.now(ZoneOffset.UTC))
         .build();
 
     Owner saved = ownerRepository.save(user);
@@ -117,12 +119,12 @@ public class OwnerService {
     Owner user = ownerRepository.findById(targetUserId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Owner not found"));
 
-    if (request.username() != null && !request.username().isBlank()
-        && !request.username().equals(user.getUsername())) {
-      if (ownerRepository.existsByUsername(request.username())) {
-        throw new ResponseStatusException(HttpStatus.CONFLICT, "Username already exists");
+    if (request.email() != null && !request.email().isBlank()
+        && !request.email().equals(user.getEmail())) {
+      if (ownerRepository.existsByEmail(request.email())) {
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists");
       }
-      user.setUsername(request.username());
+      user.setEmail(request.email());
     }
 
     if (request.password() != null && !request.password().isBlank()) {
@@ -219,7 +221,7 @@ public class OwnerService {
 
     return new OwnerResponse(
         user.getId(),
-        user.getUsername(),
+        user.getEmail(),
         user.getRole(),
         user.getCreatedAt(),
         domainIds
