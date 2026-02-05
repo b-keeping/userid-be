@@ -26,6 +26,11 @@ public class DomainService {
   private final OwnerDomainRepository ownerDomainRepository;
   private final OwnerRepository ownerRepository;
   private final AccessService accessService;
+  private final PostalAdminClient postalAdminClient;
+  @org.springframework.beans.factory.annotation.Value("${auth.postal-admin.organization:Org1}")
+  private String postalOrganization;
+  @org.springframework.beans.factory.annotation.Value("${auth.postal-admin.server:srv1}")
+  private String postalServer;
 
   public DomainResponse create(Long ownerId, DomainRequest request) {
     Owner requester = accessService.requireUser(ownerId);
@@ -62,7 +67,8 @@ public class DomainService {
       }
       linkDomain(requester, saved);
     }
-    return toResponse(saved);
+    populatePostal(saved);
+    return toResponse(domainRepository.save(saved));
   }
 
   public List<DomainResponse> list(Long ownerId) {
@@ -117,6 +123,32 @@ public class DomainService {
 
 
   private DomainResponse toResponse(Domain domain) {
-    return new DomainResponse(domain.getId(), domain.getName());
+    return new DomainResponse(
+        domain.getId(),
+        domain.getName(),
+        domain.getPostalStatus(),
+        domain.getPostalError(),
+        domain.getPostalDomainJsonb(),
+        domain.getPostalDnsRecordsJsonb(),
+        domain.getPostalDnsCheckJsonb()
+    );
+  }
+
+  private void populatePostal(Domain domain) {
+    try {
+      PostalAdminClient.PostalAdminResponse response = postalAdminClient.checkDomain(
+          postalOrganization,
+          postalServer,
+          domain.getName()
+      );
+      domain.setPostalStatus(response.ok() ? "ok" : "error");
+      domain.setPostalError(response.error());
+      domain.setPostalDomainJsonb(response.domain());
+      domain.setPostalDnsRecordsJsonb(response.dnsRecords());
+      domain.setPostalDnsCheckJsonb(response.dnsCheck());
+    } catch (ResponseStatusException ex) {
+      domain.setPostalStatus("error");
+      domain.setPostalError(ex.getReason());
+    }
   }
 }
