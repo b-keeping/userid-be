@@ -38,16 +38,30 @@ public class PostalAdminClient {
         .build();
   }
 
-  public PostalAdminResponse checkDomain(String organization, String server, String domain) {
+  public PostalAdminResponse provisionDomain(
+      String organization,
+      String templateServer,
+      String server,
+      String domain,
+      String smtpName,
+      boolean smtpHold
+  ) {
     try {
-      Map<String, String> payload = new HashMap<>();
+      Map<String, Object> payload = new HashMap<>();
       payload.put("organization", organization);
+      payload.put("template_server", templateServer);
       payload.put("server", server);
       payload.put("domain", domain);
+      Map<String, Object> smtp = new HashMap<>();
+      smtp.put("name", smtpName);
+      smtp.put("hold", smtpHold);
+      Map<String, Object> credentials = new HashMap<>();
+      credentials.put("smtp", smtp);
+      payload.put("credentials", credentials);
 
       String body = objectMapper.writeValueAsString(payload);
       HttpRequest request = HttpRequest.newBuilder()
-          .uri(URI.create(baseUrl + "/domain/check"))
+          .uri(URI.create(baseUrl + "/provision"))
           .timeout(timeout)
           .header("Content-Type", "application/json")
           .header("X-Postal-Admin-Token", token)

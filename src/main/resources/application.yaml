@@ -44,3 +44,6 @@ auth:
     timeout-seconds: ${AUTH_POSTAL_ADMIN_TIMEOUT_SECONDS:15}
     organization: ${AUTH_POSTAL_ADMIN_ORG:Org1}
     server: ${AUTH_POSTAL_ADMIN_SERVER:srv1}
+    template-server: ${AUTH_POSTAL_ADMIN_TEMPLATE_SERVER:Server1}
+    smtp-name: ${AUTH_POSTAL_ADMIN_SMTP_NAME:SMTP}
+    smtp-hold: ${AUTH_POSTAL_ADMIN_SMTP_HOLD:false}

@@ -31,6 +31,12 @@ public class DomainService {
   private String postalOrganization;
   @org.springframework.beans.factory.annotation.Value("${auth.postal-admin.server:srv1}")
   private String postalServer;
+  @org.springframework.beans.factory.annotation.Value("${auth.postal-admin.template-server:Server1}")
+  private String postalTemplateServer;
+  @org.springframework.beans.factory.annotation.Value("${auth.postal-admin.smtp-name:SMTP}")
+  private String postalSmtpName;
+  @org.springframework.beans.factory.annotation.Value("${auth.postal-admin.smtp-hold:false}")
+  private boolean postalSmtpHold;
 
   public DomainResponse create(Long ownerId, DomainRequest request) {
     Owner requester = accessService.requireUser(ownerId);
@@ -136,10 +142,14 @@ public class DomainService {
 
   private void populatePostal(Domain domain) {
     try {
-      PostalAdminClient.PostalAdminResponse response = postalAdminClient.checkDomain(
+      String serverName = buildPostalServerName(domain.getName(), domain.getId(), postalServer);
+      PostalAdminClient.PostalAdminResponse response = postalAdminClient.provisionDomain(
           postalOrganization,
-          postalServer,
-          domain.getName()
+          postalTemplateServer,
+          serverName,
+          domain.getName(),
+          postalSmtpName,
+          postalSmtpHold
       );
       domain.setPostalStatus(response.ok() ? "ok" : "error");
       domain.setPostalError(response.error());
@@ -150,5 +160,15 @@ public class DomainService {
       domain.setPostalStatus("error");
       domain.setPostalError(ex.getReason());
     }
+  }
+
+  private String buildPostalServerName(String domainName, Long domainId, String fallback) {
+    if (domainName != null && !domainName.isBlank()) {
+      return domainName;
+    }
+    if (domainId != null) {
+      return "srv-" + domainId;
+    }
+    return fallback;
   }
 }
