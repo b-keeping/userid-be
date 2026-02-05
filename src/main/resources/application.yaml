@@ -39,7 +39,7 @@ auth:
     container: ${AUTH_POSTAL_CONTAINER:postal_web}
     timeout-seconds: ${AUTH_POSTAL_TIMEOUT_SECONDS:60}
   postal-admin:
-    base-url: ${AUTH_POSTAL_ADMIN_URL:http://postal_admin:8181}
+    base-url: ${AUTH_POSTAL_ADMIN_URL:http://postal-admin:8181}
     token: ${AUTH_POSTAL_ADMIN_TOKEN:change-me-long-random-token}
     timeout-seconds: ${AUTH_POSTAL_ADMIN_TIMEOUT_SECONDS:15}
     organization: ${AUTH_POSTAL_ADMIN_ORG:Org1}
