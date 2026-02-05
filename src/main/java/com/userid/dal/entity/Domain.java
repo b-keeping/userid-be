@@ -53,6 +53,26 @@ public class Domain {
   @JdbcTypeCode(SqlTypes.JSON)
   private JsonNode postalDnsCheckJsonb;
 
+  @Column(name = "postal_verification_jsonb", columnDefinition = "jsonb")
+  @JdbcTypeCode(SqlTypes.JSON)
+  private JsonNode postalVerificationJsonb;
+
+  @Column(name = "postal_spf_jsonb", columnDefinition = "jsonb")
+  @JdbcTypeCode(SqlTypes.JSON)
+  private JsonNode postalSpfJsonb;
+
+  @Column(name = "postal_dkim_jsonb", columnDefinition = "jsonb")
+  @JdbcTypeCode(SqlTypes.JSON)
+  private JsonNode postalDkimJsonb;
+
+  @Column(name = "postal_return_path_jsonb", columnDefinition = "jsonb")
+  @JdbcTypeCode(SqlTypes.JSON)
+  private JsonNode postalReturnPathJsonb;
+
+  @Column(name = "postal_mx_jsonb", columnDefinition = "jsonb")
+  @JdbcTypeCode(SqlTypes.JSON)
+  private JsonNode postalMxJsonb;
+
   @Builder.Default
   @OneToMany(mappedBy = "domain", cascade = CascadeType.ALL, orphanRemoval = true)
   private Set<ProfileField> profileFields = new HashSet<>();

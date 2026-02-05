@@ -9,5 +9,10 @@ public record DomainResponse(
     String postalError,
     JsonNode postalDomain,
     JsonNode postalDnsRecords,
-    JsonNode postalDnsCheck
+    JsonNode postalDnsCheck,
+    JsonNode postalVerification,
+    JsonNode postalSpf,
+    JsonNode postalDkim,
+    JsonNode postalReturnPath,
+    JsonNode postalMx
 ) {}

@@ -1,5 +1,9 @@
 package com.userid.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.userid.api.domain.DomainRequest;
 import com.userid.api.domain.DomainResponse;
 import com.userid.api.domain.DomainUpdateRequest;
@@ -27,6 +31,7 @@ public class DomainService {
   private final OwnerRepository ownerRepository;
   private final AccessService accessService;
   private final PostalAdminClient postalAdminClient;
+  private final ObjectMapper objectMapper;
   @org.springframework.beans.factory.annotation.Value("${auth.postal-admin.organization:Org1}")
   private String postalOrganization;
   @org.springframework.beans.factory.annotation.Value("${auth.postal-admin.server:srv1}")
@@ -136,7 +141,12 @@ public class DomainService {
         domain.getPostalError(),
         domain.getPostalDomainJsonb(),
         domain.getPostalDnsRecordsJsonb(),
-        domain.getPostalDnsCheckJsonb()
+        domain.getPostalDnsCheckJsonb(),
+        domain.getPostalVerificationJsonb(),
+        domain.getPostalSpfJsonb(),
+        domain.getPostalDkimJsonb(),
+        domain.getPostalReturnPathJsonb(),
+        domain.getPostalMxJsonb()
     );
   }
 
@@ -156,6 +166,11 @@ public class DomainService {
       domain.setPostalDomainJsonb(response.domain());
       domain.setPostalDnsRecordsJsonb(response.dnsRecords());
       domain.setPostalDnsCheckJsonb(response.dnsCheck());
+      domain.setPostalVerificationJsonb(buildPostalPurpose("verification", response.dnsRecords(), response.dnsCheck()));
+      domain.setPostalSpfJsonb(buildPostalPurpose("spf", response.dnsRecords(), response.dnsCheck()));
+      domain.setPostalDkimJsonb(buildPostalPurpose("dkim", response.dnsRecords(), response.dnsCheck()));
+      domain.setPostalReturnPathJsonb(buildPostalPurpose("return_path", response.dnsRecords(), response.dnsCheck()));
+      domain.setPostalMxJsonb(buildPostalPurpose("mx", response.dnsRecords(), response.dnsCheck()));
     } catch (ResponseStatusException ex) {
       domain.setPostalStatus("error");
       domain.setPostalError(ex.getReason());
@@ -170,5 +185,47 @@ public class DomainService {
       return "srv-" + domainId;
     }
     return fallback;
+  }
+
+  private JsonNode buildPostalPurpose(String purpose, JsonNode dnsRecords, JsonNode dnsCheck) {
+    ObjectNode node = objectMapper.createObjectNode();
+    ArrayNode records = objectMapper.createArrayNode();
+    ArrayNode checks = objectMapper.createArrayNode();
+
+    if (dnsRecords != null && dnsRecords.isArray()) {
+      for (JsonNode record : dnsRecords) {
+        if (purpose.equals(record.path("purpose").asText(null))) {
+          records.add(record);
+        }
+      }
+    }
+
+    if (dnsCheck != null && dnsCheck.has("checks") && dnsCheck.get("checks").isArray()) {
+      for (JsonNode check : dnsCheck.get("checks")) {
+        if (purpose.equals(check.path("purpose").asText(null))) {
+          checks.add(check);
+        }
+      }
+    }
+
+    node.set("records", records);
+    node.set("checks", checks);
+
+    if (checks.size() > 0) {
+      boolean allOk = true;
+      boolean allOptional = true;
+      for (JsonNode check : checks) {
+        if (!check.path("ok").asBoolean(false)) {
+          allOk = false;
+        }
+        if (!check.path("optional").asBoolean(false)) {
+          allOptional = false;
+        }
+      }
+      node.put("ok", allOk);
+      node.put("optional", allOptional);
+    }
+
+    return node;
   }
 }
