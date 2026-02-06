@@ -54,6 +54,14 @@ public class DomainController {
     return domainService.checkDns(principal.id(), domainId);
   }
 
+  @PostMapping("/{domainId}/verify")
+  public DomainResponse verify(
+      @AuthenticationPrincipal AuthPrincipal principal,
+      @PathVariable Long domainId
+  ) {
+    return domainService.verifyDomain(principal.id(), domainId);
+  }
+
   @DeleteMapping("/{domainId}")
   public ApiMessage delete(
       @AuthenticationPrincipal AuthPrincipal principal,

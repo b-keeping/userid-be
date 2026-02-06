@@ -148,6 +148,41 @@ public class DomainService {
     return toResponse(domainRepository.save(domain));
   }
 
+  public DomainResponse verifyDomain(Long ownerId, Long domainId) {
+    accessService.requireDomainAccess(ownerId, domainId);
+    Domain domain = domainRepository.findById(domainId)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found"));
+
+    String serverName = buildServerName(domain.getName(), domain.getId(), dnsServer);
+    try {
+      DnsAdminClient.VerifyCheckResponse verifyResponse =
+          dnsAdminClient.verifyCheck(dnsOrganization, serverName, domain.getName());
+      if (verifyResponse.record() != null) {
+        applyRecord(
+            verifyResponse.record(),
+            domain::setVerify,
+            domain::setVerifyHost,
+            domain::setVerifyType,
+            null,
+            null,
+            domain::setVerifyStt
+        );
+      }
+      if (verifyResponse.ok()) {
+        domain.setDnsStatus("ok");
+        domain.setDnsError(null);
+      } else {
+        domain.setDnsStatus("error");
+        domain.setDnsError(verifyResponse.error());
+      }
+    } catch (ResponseStatusException ex) {
+      domain.setDnsStatus("error");
+      domain.setDnsError(ex.getReason());
+    }
+
+    return toResponse(domainRepository.save(domain));
+  }
+
   @Transactional
   public void delete(Long ownerId, Long domainId) {
     accessService.requireDomainAccess(ownerId, domainId);
