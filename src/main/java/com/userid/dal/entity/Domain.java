@@ -8,7 +8,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
-import com.fasterxml.jackson.databind.JsonNode;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.AllArgsConstructor;
@@ -16,9 +15,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "domains")
@@ -41,37 +37,35 @@ public class Domain {
   @Column(name = "postal_error", length = 1024)
   private String postalError;
 
-  @Column(name = "postal_domain_jsonb", columnDefinition = "jsonb")
-  @JdbcTypeCode(SqlTypes.JSON)
-  private JsonNode postalDomainJsonb;
+  @Column(name = "verify", length = 1024)
+  private String verify;
 
-  @Column(name = "postal_dns_records_jsonb", columnDefinition = "jsonb")
-  @JdbcTypeCode(SqlTypes.JSON)
-  private JsonNode postalDnsRecordsJsonb;
+  @Column(name = "verify_stt")
+  private Boolean verifyStt;
 
-  @Column(name = "postal_dns_check_jsonb", columnDefinition = "jsonb")
-  @JdbcTypeCode(SqlTypes.JSON)
-  private JsonNode postalDnsCheckJsonb;
+  @Column(name = "spf", length = 2048)
+  private String spf;
 
-  @Column(name = "postal_verification_jsonb", columnDefinition = "jsonb")
-  @JdbcTypeCode(SqlTypes.JSON)
-  private JsonNode postalVerificationJsonb;
+  @Column(name = "spf_stt")
+  private Boolean spfStt;
 
-  @Column(name = "postal_spf_jsonb", columnDefinition = "jsonb")
-  @JdbcTypeCode(SqlTypes.JSON)
-  private JsonNode postalSpfJsonb;
+  @Column(name = "dkim", length = 4096)
+  private String dkim;
 
-  @Column(name = "postal_dkim_jsonb", columnDefinition = "jsonb")
-  @JdbcTypeCode(SqlTypes.JSON)
-  private JsonNode postalDkimJsonb;
+  @Column(name = "dkim_stt")
+  private Boolean dkimStt;
 
-  @Column(name = "postal_return_path_jsonb", columnDefinition = "jsonb")
-  @JdbcTypeCode(SqlTypes.JSON)
-  private JsonNode postalReturnPathJsonb;
+  @Column(name = "mx", length = 1024)
+  private String mx;
 
-  @Column(name = "postal_mx_jsonb", columnDefinition = "jsonb")
-  @JdbcTypeCode(SqlTypes.JSON)
-  private JsonNode postalMxJsonb;
+  @Column(name = "mx_stt")
+  private Boolean mxStt;
+
+  @Column(name = "return_path", length = 1024)
+  private String returnPath;
+
+  @Column(name = "return_path_stt")
+  private Boolean returnPathStt;
 
   @Builder.Default
   @OneToMany(mappedBy = "domain", cascade = CascadeType.ALL, orphanRemoval = true)

@@ -1,9 +1,5 @@
 package com.userid.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.userid.api.domain.DomainRequest;
 import com.userid.api.domain.DomainResponse;
 import com.userid.api.domain.DomainUpdateRequest;
@@ -31,17 +27,12 @@ public class DomainService {
   private final OwnerRepository ownerRepository;
   private final AccessService accessService;
   private final PostalAdminClient postalAdminClient;
-  private final ObjectMapper objectMapper;
   @org.springframework.beans.factory.annotation.Value("${auth.postal-admin.organization:Org1}")
   private String postalOrganization;
   @org.springframework.beans.factory.annotation.Value("${auth.postal-admin.server:srv1}")
   private String postalServer;
   @org.springframework.beans.factory.annotation.Value("${auth.postal-admin.template-server:Server1}")
   private String postalTemplateServer;
-  @org.springframework.beans.factory.annotation.Value("${auth.postal-admin.smtp-name:SMTP}")
-  private String postalSmtpName;
-  @org.springframework.beans.factory.annotation.Value("${auth.postal-admin.smtp-hold:false}")
-  private boolean postalSmtpHold;
 
   public DomainResponse create(Long ownerId, DomainRequest request) {
     Owner requester = accessService.requireUser(ownerId);
@@ -111,6 +102,42 @@ public class DomainService {
     return toResponse(saved);
   }
 
+  public DomainResponse checkDns(Long ownerId, Long domainId) {
+    accessService.requireDomainAccess(ownerId, domainId);
+    Domain domain = domainRepository.findById(domainId)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found"));
+
+    String serverName = buildPostalServerName(domain.getName(), domain.getId(), postalServer);
+    try {
+      PostalAdminClient.VerifyCheckResponse verifyResponse =
+          postalAdminClient.verifyCheck(postalOrganization, serverName, domain.getName());
+      if (verifyResponse.verification() != null) {
+        domain.setVerify(verifyResponse.verification().path("value").asText(null));
+        domain.setVerifyStt(verifyResponse.verification().path("ok").asBoolean(false));
+      }
+
+      PostalAdminClient.DnsCheckResponse dnsResponse =
+          postalAdminClient.dnsCheck(postalOrganization, serverName, domain.getName());
+      applyValueStatus(dnsResponse.spf(), domain::setSpf, domain::setSpfStt);
+      applyValueStatus(dnsResponse.dkim(), domain::setDkim, domain::setDkimStt);
+      applyValueStatus(dnsResponse.returnPath(), domain::setReturnPath, domain::setReturnPathStt);
+      applyValueStatus(dnsResponse.mx(), domain::setMx, domain::setMxStt);
+
+      if (verifyResponse.ok() && dnsResponse.ok()) {
+        domain.setPostalStatus("ok");
+        domain.setPostalError(null);
+      } else {
+        domain.setPostalStatus("error");
+        domain.setPostalError(firstError(verifyResponse.error(), dnsResponse.error()));
+      }
+    } catch (ResponseStatusException ex) {
+      domain.setPostalStatus("error");
+      domain.setPostalError(ex.getReason());
+    }
+
+    return toResponse(domainRepository.save(domain));
+  }
+
   public void delete(Long ownerId, Long domainId) {
     accessService.requireDomainAccess(ownerId, domainId);
     if (!domainRepository.existsById(domainId)) {
@@ -139,38 +166,43 @@ public class DomainService {
         domain.getName(),
         domain.getPostalStatus(),
         domain.getPostalError(),
-        domain.getPostalDomainJsonb(),
-        domain.getPostalDnsRecordsJsonb(),
-        domain.getPostalDnsCheckJsonb(),
-        domain.getPostalVerificationJsonb(),
-        domain.getPostalSpfJsonb(),
-        domain.getPostalDkimJsonb(),
-        domain.getPostalReturnPathJsonb(),
-        domain.getPostalMxJsonb()
+        domain.getVerify(),
+        domain.getVerifyStt(),
+        domain.getSpf(),
+        domain.getSpfStt(),
+        domain.getDkim(),
+        domain.getDkimStt(),
+        domain.getMx(),
+        domain.getMxStt(),
+        domain.getReturnPath(),
+        domain.getReturnPathStt()
     );
   }
 
   private void populatePostal(Domain domain) {
     try {
       String serverName = buildPostalServerName(domain.getName(), domain.getId(), postalServer);
-      PostalAdminClient.PostalAdminResponse response = postalAdminClient.provisionDomain(
+      PostalAdminClient.ProvisionResponse response = postalAdminClient.provisionDomain(
           postalOrganization,
           postalTemplateServer,
           serverName,
-          domain.getName(),
-          postalSmtpName,
-          postalSmtpHold
+          domain.getName()
       );
       domain.setPostalStatus(response.ok() ? "ok" : "error");
       domain.setPostalError(response.error());
-      domain.setPostalDomainJsonb(response.domain());
-      domain.setPostalDnsRecordsJsonb(response.dnsRecords());
-      domain.setPostalDnsCheckJsonb(response.dnsCheck());
-      domain.setPostalVerificationJsonb(buildPostalPurpose("verification", response.dnsRecords(), response.dnsCheck()));
-      domain.setPostalSpfJsonb(buildPostalPurpose("spf", response.dnsRecords(), response.dnsCheck()));
-      domain.setPostalDkimJsonb(buildPostalPurpose("dkim", response.dnsRecords(), response.dnsCheck()));
-      domain.setPostalReturnPathJsonb(buildPostalPurpose("return_path", response.dnsRecords(), response.dnsCheck()));
-      domain.setPostalMxJsonb(buildPostalPurpose("mx", response.dnsRecords(), response.dnsCheck()));
+
+      if (response.values() != null) {
+        domain.setVerify(response.values().path("verification").asText(null));
+        domain.setSpf(response.values().path("spf").asText(null));
+        domain.setDkim(response.values().path("dkim").asText(null));
+        domain.setReturnPath(response.values().path("return_path").asText(null));
+        domain.setMx(response.values().path("mx").asText(null));
+      }
+      domain.setVerifyStt(false);
+      domain.setSpfStt(false);
+      domain.setDkimStt(false);
+      domain.setReturnPathStt(false);
+      domain.setMxStt(false);
     } catch (ResponseStatusException ex) {
       domain.setPostalStatus("error");
       domain.setPostalError(ex.getReason());
@@ -187,45 +219,25 @@ public class DomainService {
     return fallback;
   }
 
-  private JsonNode buildPostalPurpose(String purpose, JsonNode dnsRecords, JsonNode dnsCheck) {
-    ObjectNode node = objectMapper.createObjectNode();
-    ArrayNode records = objectMapper.createArrayNode();
-    ArrayNode checks = objectMapper.createArrayNode();
-
-    if (dnsRecords != null && dnsRecords.isArray()) {
-      for (JsonNode record : dnsRecords) {
-        if (purpose.equals(record.path("purpose").asText(null))) {
-          records.add(record);
-        }
-      }
+  private void applyValueStatus(
+      com.fasterxml.jackson.databind.JsonNode node,
+      java.util.function.Consumer<String> valueSetter,
+      java.util.function.Consumer<Boolean> statusSetter
+  ) {
+    if (node == null || node.isMissingNode()) {
+      return;
     }
+    valueSetter.accept(node.path("value").asText(null));
+    statusSetter.accept(node.path("ok").asBoolean(false));
+  }
 
-    if (dnsCheck != null && dnsCheck.has("checks") && dnsCheck.get("checks").isArray()) {
-      for (JsonNode check : dnsCheck.get("checks")) {
-        if (purpose.equals(check.path("purpose").asText(null))) {
-          checks.add(check);
-        }
-      }
+  private String firstError(String primary, String secondary) {
+    if (primary != null && !primary.isBlank()) {
+      return primary;
     }
-
-    node.set("records", records);
-    node.set("checks", checks);
-
-    if (checks.size() > 0) {
-      boolean allOk = true;
-      boolean allOptional = true;
-      for (JsonNode check : checks) {
-        if (!check.path("ok").asBoolean(false)) {
-          allOk = false;
-        }
-        if (!check.path("optional").asBoolean(false)) {
-          allOptional = false;
-        }
-      }
-      node.put("ok", allOk);
-      node.put("optional", allOptional);
+    if (secondary != null && !secondary.isBlank()) {
+      return secondary;
     }
-
-    return node;
+    return null;
   }
 }

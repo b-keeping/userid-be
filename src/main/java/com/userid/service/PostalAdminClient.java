@@ -38,30 +38,59 @@ public class PostalAdminClient {
         .build();
   }
 
-  public PostalAdminResponse provisionDomain(
+  public ProvisionResponse provisionDomain(
       String organization,
       String templateServer,
       String server,
-      String domain,
-      String smtpName,
-      boolean smtpHold
+      String domain
   ) {
-    try {
-      Map<String, Object> payload = new HashMap<>();
-      payload.put("organization", organization);
-      payload.put("template_server", templateServer);
-      payload.put("server", server);
-      payload.put("domain", domain);
-      Map<String, Object> smtp = new HashMap<>();
-      smtp.put("name", smtpName);
-      smtp.put("hold", smtpHold);
-      Map<String, Object> credentials = new HashMap<>();
-      credentials.put("smtp", smtp);
-      payload.put("credentials", credentials);
+    Map<String, Object> payload = new HashMap<>();
+    payload.put("organization", organization);
+    payload.put("template_server", templateServer);
+    payload.put("server", server);
+    payload.put("domain", domain);
 
+    JsonNode root = postJson("/provision", payload);
+    boolean ok = root.path("ok").asBoolean(false);
+    JsonNode values = root.path("values").isMissingNode() ? null : root.path("values");
+    String error = root.path("error").asText(null);
+    return new ProvisionResponse(ok, values, error);
+  }
+
+  public VerifyCheckResponse verifyCheck(String organization, String server, String domain) {
+    Map<String, Object> payload = new HashMap<>();
+    payload.put("organization", organization);
+    payload.put("server", server);
+    payload.put("domain", domain);
+
+    JsonNode root = postJson("/domain/verify-check", payload);
+    boolean ok = root.path("ok").asBoolean(false);
+    JsonNode verification = root.path("verification").isMissingNode() ? null : root.path("verification");
+    String error = root.path("error").asText(null);
+    return new VerifyCheckResponse(ok, verification, error);
+  }
+
+  public DnsCheckResponse dnsCheck(String organization, String server, String domain) {
+    Map<String, Object> payload = new HashMap<>();
+    payload.put("organization", organization);
+    payload.put("server", server);
+    payload.put("domain", domain);
+
+    JsonNode root = postJson("/domain/dns-check", payload);
+    boolean ok = root.path("ok").asBoolean(false);
+    JsonNode spf = root.path("spf").isMissingNode() ? null : root.path("spf");
+    JsonNode dkim = root.path("dkim").isMissingNode() ? null : root.path("dkim");
+    JsonNode returnPath = root.path("return_path").isMissingNode() ? null : root.path("return_path");
+    JsonNode mx = root.path("mx").isMissingNode() ? null : root.path("mx");
+    String error = root.path("error").asText(null);
+    return new DnsCheckResponse(ok, spf, dkim, returnPath, mx, error);
+  }
+
+  private JsonNode postJson(String path, Object payload) {
+    try {
       String body = objectMapper.writeValueAsString(payload);
       HttpRequest request = HttpRequest.newBuilder()
-          .uri(URI.create(baseUrl + "/provision"))
+          .uri(URI.create(baseUrl + path))
           .timeout(timeout)
           .header("Content-Type", "application/json")
           .header("X-Postal-Admin-Token", token)
@@ -75,25 +104,31 @@ public class PostalAdminClient {
             "Postal admin error: " + response.statusCode() + " " + response.body()
         );
       }
-
-      JsonNode root = objectMapper.readTree(response.body());
-      boolean ok = root.path("ok").asBoolean(false);
-      JsonNode domainNode = root.path("domain").isMissingNode() ? null : root.path("domain");
-      JsonNode dnsRecords = root.path("dns_records").isMissingNode() ? null : root.path("dns_records");
-      JsonNode dnsCheck = root.path("dns_check").isMissingNode() ? null : root.path("dns_check");
-      String error = root.path("error").asText(null);
-      return new PostalAdminResponse(ok, domainNode, dnsRecords, dnsCheck, error);
+      return objectMapper.readTree(response.body());
     } catch (IOException | InterruptedException ex) {
       Thread.currentThread().interrupt();
       throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Postal admin request failed: " + ex.getMessage(), ex);
     }
   }
 
-  public record PostalAdminResponse(
+  public record ProvisionResponse(
       boolean ok,
-      JsonNode domain,
-      JsonNode dnsRecords,
-      JsonNode dnsCheck,
+      JsonNode values,
+      String error
+  ) {}
+
+  public record VerifyCheckResponse(
+      boolean ok,
+      JsonNode verification,
+      String error
+  ) {}
+
+  public record DnsCheckResponse(
+      boolean ok,
+      JsonNode spf,
+      JsonNode dkim,
+      JsonNode returnPath,
+      JsonNode mx,
       String error
   ) {}
 }

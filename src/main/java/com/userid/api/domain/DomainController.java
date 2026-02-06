@@ -46,6 +46,14 @@ public class DomainController {
     return domainService.update(principal.id(), domainId, request);
   }
 
+  @PostMapping("/{domainId}/dns-check")
+  public DomainResponse dnsCheck(
+      @AuthenticationPrincipal AuthPrincipal principal,
+      @PathVariable Long domainId
+  ) {
+    return domainService.checkDns(principal.id(), domainId);
+  }
+
   @DeleteMapping("/{domainId}")
   public ApiMessage delete(
       @AuthenticationPrincipal AuthPrincipal principal,
