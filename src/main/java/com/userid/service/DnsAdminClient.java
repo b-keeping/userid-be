@@ -16,22 +16,25 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
-public class PostalAdminClient {
+public class DnsAdminClient {
   private final ObjectMapper objectMapper;
   private final HttpClient httpClient;
   private final String baseUrl;
   private final String token;
+  private final String tokenHeader;
   private final Duration timeout;
 
-  public PostalAdminClient(
+  public DnsAdminClient(
       ObjectMapper objectMapper,
-      @Value("${auth.postal-admin.base-url}") String baseUrl,
-      @Value("${auth.postal-admin.token}") String token,
-      @Value("${auth.postal-admin.timeout-seconds:15}") long timeoutSeconds
+      @Value("${auth.dns-admin.base-url}") String baseUrl,
+      @Value("${auth.dns-admin.token}") String token,
+      @Value("${auth.dns-admin.token-header:X-Admin-Token}") String tokenHeader,
+      @Value("${auth.dns-admin.timeout-seconds:15}") long timeoutSeconds
   ) {
     this.objectMapper = objectMapper;
     this.baseUrl = baseUrl;
     this.token = token;
+    this.tokenHeader = tokenHeader;
     this.timeout = Duration.ofSeconds(timeoutSeconds);
     this.httpClient = HttpClient.newBuilder()
         .connectTimeout(this.timeout)
@@ -93,7 +96,7 @@ public class PostalAdminClient {
           .uri(URI.create(baseUrl + path))
           .timeout(timeout)
           .header("Content-Type", "application/json")
-          .header("X-Postal-Admin-Token", token)
+          .header(tokenHeader, token)
           .POST(HttpRequest.BodyPublishers.ofString(body))
           .build();
 
@@ -101,13 +104,13 @@ public class PostalAdminClient {
       if (response.statusCode() >= 400) {
         throw new ResponseStatusException(
             HttpStatus.BAD_GATEWAY,
-            "Postal admin error: " + response.statusCode() + " " + response.body()
+            "Admin error: " + response.statusCode() + " " + response.body()
         );
       }
       return objectMapper.readTree(response.body());
     } catch (IOException | InterruptedException ex) {
       Thread.currentThread().interrupt();
-      throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Postal admin request failed: " + ex.getMessage(), ex);
+      throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Admin request failed: " + ex.getMessage(), ex);
     }
   }
 

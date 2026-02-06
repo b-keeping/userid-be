@@ -3,8 +3,8 @@ package com.userid.api.domain;
 public record DomainResponse(
     Long id,
     String name,
-    String postalStatus,
-    String postalError,
+    String dnsStatus,
+    String dnsError,
     String verify,
     Boolean verifyStt,
     String spf,

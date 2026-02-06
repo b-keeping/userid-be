@@ -26,13 +26,13 @@ public class DomainService {
   private final OwnerDomainRepository ownerDomainRepository;
   private final OwnerRepository ownerRepository;
   private final AccessService accessService;
-  private final PostalAdminClient postalAdminClient;
-  @org.springframework.beans.factory.annotation.Value("${auth.postal-admin.organization:Org1}")
-  private String postalOrganization;
-  @org.springframework.beans.factory.annotation.Value("${auth.postal-admin.server:srv1}")
-  private String postalServer;
-  @org.springframework.beans.factory.annotation.Value("${auth.postal-admin.template-server:Server1}")
-  private String postalTemplateServer;
+  private final DnsAdminClient dnsAdminClient;
+  @org.springframework.beans.factory.annotation.Value("${auth.dns-admin.organization:Org1}")
+  private String dnsOrganization;
+  @org.springframework.beans.factory.annotation.Value("${auth.dns-admin.server:srv1}")
+  private String dnsServer;
+  @org.springframework.beans.factory.annotation.Value("${auth.dns-admin.template-server:Server1}")
+  private String dnsTemplateServer;
 
   public DomainResponse create(Long ownerId, DomainRequest request) {
     Owner requester = accessService.requireUser(ownerId);
@@ -69,7 +69,7 @@ public class DomainService {
       }
       linkDomain(requester, saved);
     }
-    populatePostal(saved);
+    populateDns(saved);
     return toResponse(domainRepository.save(saved));
   }
 
@@ -107,32 +107,32 @@ public class DomainService {
     Domain domain = domainRepository.findById(domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found"));
 
-    String serverName = buildPostalServerName(domain.getName(), domain.getId(), postalServer);
+    String serverName = buildServerName(domain.getName(), domain.getId(), dnsServer);
     try {
-      PostalAdminClient.VerifyCheckResponse verifyResponse =
-          postalAdminClient.verifyCheck(postalOrganization, serverName, domain.getName());
+      DnsAdminClient.VerifyCheckResponse verifyResponse =
+          dnsAdminClient.verifyCheck(dnsOrganization, serverName, domain.getName());
       if (verifyResponse.verification() != null) {
         domain.setVerify(verifyResponse.verification().path("value").asText(null));
         domain.setVerifyStt(verifyResponse.verification().path("ok").asBoolean(false));
       }
 
-      PostalAdminClient.DnsCheckResponse dnsResponse =
-          postalAdminClient.dnsCheck(postalOrganization, serverName, domain.getName());
+      DnsAdminClient.DnsCheckResponse dnsResponse =
+          dnsAdminClient.dnsCheck(dnsOrganization, serverName, domain.getName());
       applyValueStatus(dnsResponse.spf(), domain::setSpf, domain::setSpfStt);
       applyValueStatus(dnsResponse.dkim(), domain::setDkim, domain::setDkimStt);
       applyValueStatus(dnsResponse.returnPath(), domain::setReturnPath, domain::setReturnPathStt);
       applyValueStatus(dnsResponse.mx(), domain::setMx, domain::setMxStt);
 
       if (verifyResponse.ok() && dnsResponse.ok()) {
-        domain.setPostalStatus("ok");
-        domain.setPostalError(null);
+        domain.setDnsStatus("ok");
+        domain.setDnsError(null);
       } else {
-        domain.setPostalStatus("error");
-        domain.setPostalError(firstError(verifyResponse.error(), dnsResponse.error()));
+        domain.setDnsStatus("error");
+        domain.setDnsError(firstError(verifyResponse.error(), dnsResponse.error()));
       }
     } catch (ResponseStatusException ex) {
-      domain.setPostalStatus("error");
-      domain.setPostalError(ex.getReason());
+      domain.setDnsStatus("error");
+      domain.setDnsError(ex.getReason());
     }
 
     return toResponse(domainRepository.save(domain));
@@ -164,8 +164,8 @@ public class DomainService {
     return new DomainResponse(
         domain.getId(),
         domain.getName(),
-        domain.getPostalStatus(),
-        domain.getPostalError(),
+        domain.getDnsStatus(),
+        domain.getDnsError(),
         domain.getVerify(),
         domain.getVerifyStt(),
         domain.getSpf(),
@@ -179,19 +179,19 @@ public class DomainService {
     );
   }
 
-  private void populatePostal(Domain domain) {
+  private void populateDns(Domain domain) {
     try {
-      String serverName = buildPostalServerName(domain.getName(), domain.getId(), postalServer);
-      PostalAdminClient.ProvisionResponse response = postalAdminClient.provisionDomain(
-          postalOrganization,
-          postalTemplateServer,
+      String serverName = buildServerName(domain.getName(), domain.getId(), dnsServer);
+      DnsAdminClient.ProvisionResponse response = dnsAdminClient.provisionDomain(
+          dnsOrganization,
+          dnsTemplateServer,
           serverName,
           domain.getName()
       );
-      domain.setPostalStatus(response.ok() ? "ok" : "error");
-      domain.setPostalError(response.error());
+      domain.setDnsStatus(null);
+      domain.setDnsError(null);
 
-      if (response.values() != null) {
+      if (response.ok() && response.values() != null) {
         domain.setVerify(response.values().path("verification").asText(null));
         domain.setSpf(response.values().path("spf").asText(null));
         domain.setDkim(response.values().path("dkim").asText(null));
@@ -204,12 +204,12 @@ public class DomainService {
       domain.setReturnPathStt(false);
       domain.setMxStt(false);
     } catch (ResponseStatusException ex) {
-      domain.setPostalStatus("error");
-      domain.setPostalError(ex.getReason());
+      domain.setDnsStatus("error");
+      domain.setDnsError(ex.getReason());
     }
   }
 
-  private String buildPostalServerName(String domainName, Long domainId, String fallback) {
+  private String buildServerName(String domainName, Long domainId, String fallback) {
     if (domainName != null && !domainName.isBlank()) {
       return domainName;
     }

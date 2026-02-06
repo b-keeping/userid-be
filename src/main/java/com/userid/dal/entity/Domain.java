@@ -31,11 +31,11 @@ public class Domain {
   @Column(nullable = false, length = 255)
   private String name;
 
-  @Column(name = "postal_status", length = 32)
-  private String postalStatus;
+  @Column(name = "dns_status", length = 32)
+  private String dnsStatus;
 
-  @Column(name = "postal_error", length = 1024)
-  private String postalError;
+  @Column(name = "dns_error", length = 1024)
+  private String dnsError;
 
   @Column(name = "verify", length = 1024)
   private String verify;
