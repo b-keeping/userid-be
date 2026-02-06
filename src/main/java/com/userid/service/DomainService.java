@@ -16,6 +16,8 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +26,7 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 @RequiredArgsConstructor
 public class DomainService {
+  private static final Logger log = LoggerFactory.getLogger(DomainService.class);
   private final DomainRepository domainRepository;
   private final OwnerDomainRepository ownerDomainRepository;
   private final OwnerRepository ownerRepository;
@@ -38,6 +41,7 @@ public class DomainService {
 
   public DomainResponse create(Long ownerId, DomainRequest request) {
     Owner requester = accessService.requireUser(ownerId);
+    log.info("Create domain requested ownerId={} role={} name={}", ownerId, requester.getRole(), request.name());
     if (requester.getRole() != OwnerRole.ADMIN && request.ownerId() != null) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Owner can be set only by admin");
     }
@@ -60,6 +64,7 @@ public class DomainService {
         .build();
 
     Domain saved = domainRepository.save(domain);
+    log.info("Domain created id={} name={}", saved.getId(), saved.getName());
     if (requester.getRole() == OwnerRole.ADMIN) {
       if (ownerDomainRepository.existsByDomainId(saved.getId())) {
         throw new ResponseStatusException(HttpStatus.CONFLICT, "Domain already has owner");
@@ -71,7 +76,9 @@ public class DomainService {
       }
       linkDomain(requester, saved);
     }
+    log.info("Domain ownership linked domainId={} ownerId={}", saved.getId(), requester.getRole() == OwnerRole.ADMIN ? owner.getId() : requester.getId());
     populateDns(saved);
+    log.info("Domain DNS populated domainId={}", saved.getId());
     return toResponse(domainRepository.save(saved));
   }
 
@@ -239,6 +246,7 @@ public class DomainService {
 
   private void populateDns(Domain domain) {
     try {
+      log.info("DNS provision start domainId={} name={}", domain.getId(), domain.getName());
       String serverName = buildServerName(domain.getName(), domain.getId(), dnsServer);
       DnsAdminClient.ProvisionResponse response = dnsAdminClient.provisionDomain(
           dnsOrganization,
@@ -246,6 +254,7 @@ public class DomainService {
           serverName,
           domain.getName()
       );
+      log.info("DNS provision response domainId={} ok={} error={}", domain.getId(), response.ok(), response.error());
       domain.setDnsStatus(null);
       domain.setDnsError(null);
 
@@ -256,6 +265,7 @@ public class DomainService {
         applyRecord(findRecord(records, "dkim"), domain::setDkim, domain::setDkimHost, domain::setDkimType, null, null, null);
         applyRecord(findRecord(records, "return_path"), domain::setReturnPath, domain::setReturnPathHost, domain::setReturnPathType, null, null, null);
         applyRecord(findRecord(records, "mx"), domain::setMx, domain::setMxHost, domain::setMxType, domain::setMxPriority, domain::setMxOptional, null);
+        log.info("DNS records saved domainId={}", domain.getId());
       }
       domain.setVerifyStt(false);
       domain.setSpfStt(false);
@@ -265,6 +275,7 @@ public class DomainService {
     } catch (ResponseStatusException ex) {
       domain.setDnsStatus("error");
       domain.setDnsError(ex.getReason());
+      log.warn("DNS provision failed domainId={} reason={}", domain.getId(), ex.getReason());
     }
   }
 
