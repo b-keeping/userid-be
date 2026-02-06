@@ -1,5 +1,6 @@
 package com.userid.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.userid.api.domain.DomainRequest;
 import com.userid.api.domain.DomainResponse;
 import com.userid.api.domain.DomainUpdateRequest;
@@ -111,17 +112,25 @@ public class DomainService {
     try {
       DnsAdminClient.VerifyCheckResponse verifyResponse =
           dnsAdminClient.verifyCheck(dnsOrganization, serverName, domain.getName());
-      if (verifyResponse.verification() != null) {
-        domain.setVerify(verifyResponse.verification().path("value").asText(null));
-        domain.setVerifyStt(verifyResponse.verification().path("ok").asBoolean(false));
+      if (verifyResponse.record() != null) {
+        applyRecord(
+            verifyResponse.record(),
+            domain::setVerify,
+            domain::setVerifyHost,
+            domain::setVerifyType,
+            null,
+            null,
+            domain::setVerifyStt
+        );
       }
 
       DnsAdminClient.DnsCheckResponse dnsResponse =
           dnsAdminClient.dnsCheck(dnsOrganization, serverName, domain.getName());
-      applyValueStatus(dnsResponse.spf(), domain::setSpf, domain::setSpfStt);
-      applyValueStatus(dnsResponse.dkim(), domain::setDkim, domain::setDkimStt);
-      applyValueStatus(dnsResponse.returnPath(), domain::setReturnPath, domain::setReturnPathStt);
-      applyValueStatus(dnsResponse.mx(), domain::setMx, domain::setMxStt);
+      JsonNode records = dnsResponse.records();
+      applyRecord(findRecord(records, "spf"), domain::setSpf, domain::setSpfHost, domain::setSpfType, null, null, domain::setSpfStt);
+      applyRecord(findRecord(records, "dkim"), domain::setDkim, domain::setDkimHost, domain::setDkimType, null, null, domain::setDkimStt);
+      applyRecord(findRecord(records, "return_path"), domain::setReturnPath, domain::setReturnPathHost, domain::setReturnPathType, null, null, domain::setReturnPathStt);
+      applyRecord(findRecord(records, "mx"), domain::setMx, domain::setMxHost, domain::setMxType, domain::setMxPriority, domain::setMxOptional, domain::setMxStt);
 
       if (verifyResponse.ok() && dnsResponse.ok()) {
         domain.setDnsStatus("ok");
@@ -167,14 +176,26 @@ public class DomainService {
         domain.getDnsStatus(),
         domain.getDnsError(),
         domain.getVerify(),
+        domain.getVerifyHost(),
+        domain.getVerifyType(),
         domain.getVerifyStt(),
         domain.getSpf(),
+        domain.getSpfHost(),
+        domain.getSpfType(),
         domain.getSpfStt(),
         domain.getDkim(),
+        domain.getDkimHost(),
+        domain.getDkimType(),
         domain.getDkimStt(),
         domain.getMx(),
+        domain.getMxHost(),
+        domain.getMxType(),
+        domain.getMxPriority(),
+        domain.getMxOptional(),
         domain.getMxStt(),
         domain.getReturnPath(),
+        domain.getReturnPathHost(),
+        domain.getReturnPathType(),
         domain.getReturnPathStt()
     );
   }
@@ -191,12 +212,13 @@ public class DomainService {
       domain.setDnsStatus(null);
       domain.setDnsError(null);
 
-      if (response.ok() && response.values() != null) {
-        domain.setVerify(response.values().path("verification").asText(null));
-        domain.setSpf(response.values().path("spf").asText(null));
-        domain.setDkim(response.values().path("dkim").asText(null));
-        domain.setReturnPath(response.values().path("return_path").asText(null));
-        domain.setMx(response.values().path("mx").asText(null));
+      if (response.ok() && response.records() != null) {
+        JsonNode records = response.records();
+        applyRecord(findRecord(records, "verification"), domain::setVerify, domain::setVerifyHost, domain::setVerifyType, null, null, null);
+        applyRecord(findRecord(records, "spf"), domain::setSpf, domain::setSpfHost, domain::setSpfType, null, null, null);
+        applyRecord(findRecord(records, "dkim"), domain::setDkim, domain::setDkimHost, domain::setDkimType, null, null, null);
+        applyRecord(findRecord(records, "return_path"), domain::setReturnPath, domain::setReturnPathHost, domain::setReturnPathType, null, null, null);
+        applyRecord(findRecord(records, "mx"), domain::setMx, domain::setMxHost, domain::setMxType, domain::setMxPriority, domain::setMxOptional, null);
       }
       domain.setVerifyStt(false);
       domain.setSpfStt(false);
@@ -219,16 +241,51 @@ public class DomainService {
     return fallback;
   }
 
-  private void applyValueStatus(
-      com.fasterxml.jackson.databind.JsonNode node,
+  private void applyRecord(
+      com.fasterxml.jackson.databind.JsonNode record,
       java.util.function.Consumer<String> valueSetter,
+      java.util.function.Consumer<String> hostSetter,
+      java.util.function.Consumer<String> typeSetter,
+      java.util.function.Consumer<Integer> prioritySetter,
+      java.util.function.Consumer<Boolean> optionalSetter,
       java.util.function.Consumer<Boolean> statusSetter
   ) {
-    if (node == null || node.isMissingNode()) {
+    if (record == null || record.isMissingNode()) {
       return;
     }
-    valueSetter.accept(node.path("value").asText(null));
-    statusSetter.accept(node.path("ok").asBoolean(false));
+    if (valueSetter != null) {
+      valueSetter.accept(record.path("value").asText(null));
+    }
+    if (hostSetter != null) {
+      hostSetter.accept(record.path("host").asText(null));
+    }
+    if (typeSetter != null) {
+      typeSetter.accept(record.path("type").asText(null));
+    }
+    if (prioritySetter != null && record.has("priority") && !record.get("priority").isNull()) {
+      prioritySetter.accept(record.path("priority").asInt());
+    }
+    if (optionalSetter != null && record.has("optional") && !record.get("optional").isNull()) {
+      optionalSetter.accept(record.path("optional").asBoolean());
+    }
+    if (statusSetter != null && record.has("ok") && !record.get("ok").isNull()) {
+      statusSetter.accept(record.path("ok").asBoolean());
+    }
+  }
+
+  private com.fasterxml.jackson.databind.JsonNode findRecord(
+      com.fasterxml.jackson.databind.JsonNode records,
+      String id
+  ) {
+    if (records == null || !records.isArray()) {
+      return null;
+    }
+    for (com.fasterxml.jackson.databind.JsonNode record : records) {
+      if (id.equals(record.path("id").asText(null))) {
+        return record;
+      }
+    }
+    return null;
   }
 
   private String firstError(String primary, String secondary) {

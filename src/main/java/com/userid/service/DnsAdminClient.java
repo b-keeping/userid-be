@@ -55,9 +55,9 @@ public class DnsAdminClient {
 
     JsonNode root = postJson("/provision", payload);
     boolean ok = root.path("ok").asBoolean(false);
-    JsonNode values = root.path("values").isMissingNode() ? null : root.path("values");
+    JsonNode records = root.path("records").isMissingNode() ? null : root.path("records");
     String error = root.path("error").asText(null);
-    return new ProvisionResponse(ok, values, error);
+    return new ProvisionResponse(ok, records, error);
   }
 
   public VerifyCheckResponse verifyCheck(String organization, String server, String domain) {
@@ -68,9 +68,9 @@ public class DnsAdminClient {
 
     JsonNode root = postJson("/domain/verify-check", payload);
     boolean ok = root.path("ok").asBoolean(false);
-    JsonNode verification = root.path("verification").isMissingNode() ? null : root.path("verification");
+    JsonNode record = root.path("record").isMissingNode() ? null : root.path("record");
     String error = root.path("error").asText(null);
-    return new VerifyCheckResponse(ok, verification, error);
+    return new VerifyCheckResponse(ok, record, error);
   }
 
   public DnsCheckResponse dnsCheck(String organization, String server, String domain) {
@@ -81,12 +81,9 @@ public class DnsAdminClient {
 
     JsonNode root = postJson("/domain/dns-check", payload);
     boolean ok = root.path("ok").asBoolean(false);
-    JsonNode spf = root.path("spf").isMissingNode() ? null : root.path("spf");
-    JsonNode dkim = root.path("dkim").isMissingNode() ? null : root.path("dkim");
-    JsonNode returnPath = root.path("return_path").isMissingNode() ? null : root.path("return_path");
-    JsonNode mx = root.path("mx").isMissingNode() ? null : root.path("mx");
+    JsonNode records = root.path("records").isMissingNode() ? null : root.path("records");
     String error = root.path("error").asText(null);
-    return new DnsCheckResponse(ok, spf, dkim, returnPath, mx, error);
+    return new DnsCheckResponse(ok, records, error);
   }
 
   private JsonNode postJson(String path, Object payload) {
@@ -116,22 +113,19 @@ public class DnsAdminClient {
 
   public record ProvisionResponse(
       boolean ok,
-      JsonNode values,
+      JsonNode records,
       String error
   ) {}
 
   public record VerifyCheckResponse(
       boolean ok,
-      JsonNode verification,
+      JsonNode record,
       String error
   ) {}
 
   public record DnsCheckResponse(
       boolean ok,
-      JsonNode spf,
-      JsonNode dkim,
-      JsonNode returnPath,
-      JsonNode mx,
+      JsonNode records,
       String error
   ) {}
 }
