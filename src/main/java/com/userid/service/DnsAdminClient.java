@@ -14,9 +14,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class DnsAdminClient {
+  private static final Logger log = LoggerFactory.getLogger(DnsAdminClient.class);
   private final ObjectMapper objectMapper;
   private final HttpClient httpClient;
   private final String baseUrl;
@@ -89,6 +92,7 @@ public class DnsAdminClient {
   private JsonNode postJson(String path, Object payload) {
     try {
       String body = objectMapper.writeValueAsString(payload);
+      log.info("DNS admin request {} payload={}", path, body);
       HttpRequest request = HttpRequest.newBuilder()
           .uri(URI.create(baseUrl + path))
           .timeout(timeout)
@@ -98,6 +102,7 @@ public class DnsAdminClient {
           .build();
 
       HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+      log.info("DNS admin response {} status={} body={}", path, response.statusCode(), response.body());
       if (response.statusCode() >= 400) {
         throw new ResponseStatusException(
             HttpStatus.BAD_GATEWAY,
