@@ -37,7 +37,8 @@ public class AccessService {
     if (user.getRole() == OwnerRole.ADMIN) {
       return user;
     }
-    boolean hasAccess = ownerDomainRepository.existsByOwnerIdAndDomainId(ownerId, domainId);
+    boolean hasAccess = ownerDomainRepository.findByOwnerId(ownerId).stream()
+        .anyMatch(link -> link.getDomain() != null && domainId.equals(link.getDomain().getId()));
     if (!hasAccess) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No access to domain");
     }
