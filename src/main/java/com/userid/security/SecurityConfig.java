@@ -43,6 +43,7 @@ public class SecurityConfig {
             })
         )
         .authorizeHttpRequests(auth -> auth
+            .requestMatchers("/error").permitAll()
             .requestMatchers(HttpMethod.PUT, "/api/external/domains/*/users/me").permitAll()
             .requestMatchers("/api/external/domains/*/users/**").hasRole("DOMAIN_API")
             .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()

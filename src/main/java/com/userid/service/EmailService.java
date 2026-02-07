@@ -7,9 +7,14 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class EmailService {
+  private static final Logger log = LoggerFactory.getLogger(EmailService.class);
   private final JavaMailSender mailSender;
   private final String fromAddress;
   private final String smtpHost;
@@ -95,7 +100,19 @@ public class EmailService {
     message.setFrom(fromAddress);
     message.setSubject(subject);
     message.setText(text);
-    resolveSender(domain).send(message);
+    JavaMailSender sender = resolveSender(domain);
+    try {
+      sender.send(message);
+    } catch (Exception ex) {
+      Long domainId = domain != null ? domain.getId() : null;
+      String domainName = domain != null ? domain.getName() : null;
+      String smtpUser = domain != null ? domain.getSmtpUsername() : null;
+      log.error(
+          "Email send failed domainId={} domainName={} to={} smtpHost={} smtpUser={} error={}",
+          domainId, domainName, to, smtpHost, smtpUser, ex.getMessage(), ex
+      );
+      throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Email send failed");
+    }
   }
 
   private JavaMailSender resolveSender(Domain domain) {
