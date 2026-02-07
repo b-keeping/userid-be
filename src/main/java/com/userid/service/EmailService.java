@@ -107,9 +107,10 @@ public class EmailService {
       Long domainId = domain != null ? domain.getId() : null;
       String domainName = domain != null ? domain.getName() : null;
       String smtpUser = domain != null ? domain.getSmtpUsername() : null;
+      String smtpUserUsed = smtpUser == null || smtpUser.isBlank() ? smtpUsername : smtpUser;
       log.error(
-          "Email send failed domainId={} domainName={} to={} smtpHost={} smtpUser={} error={}",
-          domainId, domainName, to, smtpHost, smtpUser, ex.getMessage(), ex
+          "Email send failed domainId={} domainName={} to={} smtpHost={} smtpUser={} smtpUserUsed={} error={}",
+          domainId, domainName, to, smtpHost, smtpUser, smtpUserUsed, ex.getMessage(), ex
       );
       throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Email send failed");
     }
@@ -119,16 +120,19 @@ public class EmailService {
     if (domain == null) {
       return mailSender;
     }
-    String username = domain.getSmtpUsername();
-    if (username == null || username.isBlank()) {
-      return mailSender;
-    }
     if (smtpHost == null || smtpHost.isBlank()) {
       return mailSender;
     }
+    String username = domain.getSmtpUsername();
     String password = domain.getSmtpPassword();
+    if (username == null || username.isBlank()) {
+      username = smtpUsername;
+    }
     if (password == null || password.isBlank()) {
-      password = username;
+      return mailSender;
+    }
+    if (username == null || username.isBlank()) {
+      return mailSender;
     }
 
     JavaMailSenderImpl sender = new JavaMailSenderImpl();

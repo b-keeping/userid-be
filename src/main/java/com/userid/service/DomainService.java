@@ -293,7 +293,7 @@ public class DomainService {
       if (response.ok() && response.smtp() != null) {
         String smtpKey = response.smtp().path("key").asText(null);
         if (smtpKey != null && !smtpKey.isBlank()) {
-          domain.setSmtpUsername(smtpKey);
+          domain.setSmtpUsername(null);
           domain.setSmtpPassword(smtpKey);
           log.info("SMTP credentials saved domainId={}", domain.getId());
         }

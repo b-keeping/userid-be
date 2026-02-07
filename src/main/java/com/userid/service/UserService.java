@@ -46,6 +46,7 @@ public class UserService {
   private final EmailService emailService;
   private final UserOtpService userOtpService;
 
+  @org.springframework.transaction.annotation.Transactional
   public UserResponse register(Long serviceUserId, Long domainId, UserRegistrationRequest request) {
     accessService.requireDomainAccess(serviceUserId, domainId);
     Domain domain = domainRepository.findById(domainId)
@@ -53,6 +54,7 @@ public class UserService {
     return registerInternal(domain, request);
   }
 
+  @org.springframework.transaction.annotation.Transactional
   public UserResponse registerByDomain(Long domainId, UserRegistrationRequest request) {
     Domain domain = domainRepository.findById(domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found"));
@@ -115,6 +117,7 @@ public class UserService {
     userRepository.delete(user);
   }
 
+  @org.springframework.transaction.annotation.Transactional
   private UserResponse registerInternal(Domain domain, UserRegistrationRequest request) {
     Long domainId = domain.getId();
     if (userRepository.existsByDomainIdAndEmail(domainId, request.email())) {
