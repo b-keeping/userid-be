@@ -214,6 +214,7 @@ public class DomainService {
 
 
   private DomainResponse toResponse(Domain domain) {
+    boolean verified = Boolean.TRUE.equals(domain.getVerifyStt());
     return new DomainResponse(
         domain.getId(),
         domain.getName(),
@@ -223,24 +224,24 @@ public class DomainService {
         domain.getVerifyHost(),
         domain.getVerifyType(),
         domain.getVerifyStt(),
-        domain.getSpf(),
-        domain.getSpfHost(),
-        domain.getSpfType(),
-        domain.getSpfStt(),
-        domain.getDkim(),
-        domain.getDkimHost(),
-        domain.getDkimType(),
-        domain.getDkimStt(),
-        domain.getMx(),
-        domain.getMxHost(),
-        domain.getMxType(),
-        domain.getMxPriority(),
-        domain.getMxOptional(),
-        domain.getMxStt(),
-        domain.getReturnPath(),
-        domain.getReturnPathHost(),
-        domain.getReturnPathType(),
-        domain.getReturnPathStt()
+        verified ? domain.getSpf() : null,
+        verified ? domain.getSpfHost() : null,
+        verified ? domain.getSpfType() : null,
+        verified ? domain.getSpfStt() : null,
+        verified ? domain.getDkim() : null,
+        verified ? domain.getDkimHost() : null,
+        verified ? domain.getDkimType() : null,
+        verified ? domain.getDkimStt() : null,
+        verified ? domain.getMx() : null,
+        verified ? domain.getMxHost() : null,
+        verified ? domain.getMxType() : null,
+        verified ? domain.getMxPriority() : null,
+        verified ? domain.getMxOptional() : null,
+        verified ? domain.getMxStt() : null,
+        verified ? domain.getReturnPath() : null,
+        verified ? domain.getReturnPathHost() : null,
+        verified ? domain.getReturnPathType() : null,
+        verified ? domain.getReturnPathStt() : null
     );
   }
 
