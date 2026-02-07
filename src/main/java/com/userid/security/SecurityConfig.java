@@ -36,7 +36,7 @@ public class SecurityConfig {
             .requestMatchers(HttpMethod.POST, "/api/auth/reset-password").permitAll()
             .anyRequest().authenticated()
         )
-        .addFilterBefore(domainApiAuthenticationFilter, JwtAuthenticationFilter.class)
+        .addFilterBefore(domainApiAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
         .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
     return http.build();
