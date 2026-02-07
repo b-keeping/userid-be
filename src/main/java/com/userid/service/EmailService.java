@@ -3,7 +3,6 @@ package com.userid.service;
 import com.userid.dal.entity.Domain;
 import java.util.Properties;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.mail.MailProperties;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
@@ -12,17 +11,38 @@ import org.springframework.stereotype.Service;
 @Service
 public class EmailService {
   private final JavaMailSender mailSender;
-  private final MailProperties mailProperties;
   private final String fromAddress;
+  private final String smtpHost;
+  private final int smtpPort;
+  private final String smtpProtocol;
+  private final String smtpDefaultEncoding;
+  private final String smtpUsername;
+  private final String smtpPassword;
+  private final boolean smtpAuth;
+  private final boolean smtpStartTls;
 
   public EmailService(
       JavaMailSender mailSender,
-      MailProperties mailProperties,
+      @Value("${spring.mail.host:}") String smtpHost,
+      @Value("${spring.mail.port:587}") int smtpPort,
+      @Value("${spring.mail.protocol:}") String smtpProtocol,
+      @Value("${spring.mail.default-encoding:}") String smtpDefaultEncoding,
+      @Value("${spring.mail.username:}") String smtpUsername,
+      @Value("${spring.mail.password:}") String smtpPassword,
+      @Value("${spring.mail.properties.mail.smtp.auth:true}") boolean smtpAuth,
+      @Value("${spring.mail.properties.mail.smtp.starttls.enable:true}") boolean smtpStartTls,
       @Value("${auth.email.from:no-reply@userid.local}") String fromAddress
   ) {
     this.mailSender = mailSender;
-    this.mailProperties = mailProperties;
     this.fromAddress = fromAddress;
+    this.smtpHost = smtpHost;
+    this.smtpPort = smtpPort;
+    this.smtpProtocol = smtpProtocol;
+    this.smtpDefaultEncoding = smtpDefaultEncoding;
+    this.smtpUsername = smtpUsername;
+    this.smtpPassword = smtpPassword;
+    this.smtpAuth = smtpAuth;
+    this.smtpStartTls = smtpStartTls;
   }
 
   public void sendVerificationEmail(String to, String link) {
@@ -86,8 +106,7 @@ public class EmailService {
     if (username == null || username.isBlank()) {
       return mailSender;
     }
-    String host = mailProperties.getHost();
-    if (host == null || host.isBlank()) {
+    if (smtpHost == null || smtpHost.isBlank()) {
       return mailSender;
     }
     String password = domain.getSmtpPassword();
@@ -96,18 +115,19 @@ public class EmailService {
     }
 
     JavaMailSenderImpl sender = new JavaMailSenderImpl();
-    sender.setHost(host);
-    sender.setPort(mailProperties.getPort());
+    sender.setHost(smtpHost);
+    sender.setPort(smtpPort);
     sender.setUsername(username);
     sender.setPassword(password);
-    if (mailProperties.getProtocol() != null && !mailProperties.getProtocol().isBlank()) {
-      sender.setProtocol(mailProperties.getProtocol());
+    if (smtpProtocol != null && !smtpProtocol.isBlank()) {
+      sender.setProtocol(smtpProtocol);
     }
-    if (mailProperties.getDefaultEncoding() != null && !mailProperties.getDefaultEncoding().isBlank()) {
-      sender.setDefaultEncoding(mailProperties.getDefaultEncoding());
+    if (smtpDefaultEncoding != null && !smtpDefaultEncoding.isBlank()) {
+      sender.setDefaultEncoding(smtpDefaultEncoding);
     }
     Properties props = new Properties();
-    props.putAll(mailProperties.getProperties());
+    props.put("mail.smtp.auth", String.valueOf(smtpAuth));
+    props.put("mail.smtp.starttls.enable", String.valueOf(smtpStartTls));
     sender.setJavaMailProperties(props);
     return sender;
   }
