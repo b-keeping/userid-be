@@ -50,24 +50,13 @@ public class UserService {
     accessService.requireDomainAccess(serviceUserId, domainId);
     Domain domain = domainRepository.findById(domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found"));
+    return registerInternal(domain, request);
+  }
 
-    if (userRepository.existsByDomainIdAndEmail(domainId, request.email())) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists in domain");
-    }
-
-    User user = User.builder()
-        .domain(domain)
-        .email(request.email())
-        .passwordHash(passwordEncoder.encode(requirePassword(request.password())))
-        .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
-        .build();
-
-    applyProfileValues(user, domainId, request.values());
-    String otpCode = userOtpService.createVerificationCode(user);
-
-    User saved = userRepository.save(user);
-    emailService.sendOtpEmail(saved.getEmail(), otpCode);
-    return toResponse(saved);
+  public UserResponse registerByDomain(Long domainId, UserRegistrationRequest request) {
+    Domain domain = domainRepository.findById(domainId)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found"));
+    return registerInternal(domain, request);
   }
 
   public UserResponse get(Long serviceUserId, Long domainId, Long userId) {
@@ -110,6 +99,47 @@ public class UserService {
     accessService.requireDomainAccess(serviceUserId, domainId);
     User user = userRepository.findByIdAndDomainId(userId, domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+    return updateInternal(user, domainId, request, true);
+  }
+
+  public UserResponse updateByDomain(Long domainId, Long userId, UserUpdateRequest request) {
+    User user = userRepository.findByIdAndDomainId(userId, domainId)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+    return updateInternal(user, domainId, request, false);
+  }
+
+  public void delete(Long serviceUserId, Long domainId, Long userId) {
+    accessService.requireDomainAccess(serviceUserId, domainId);
+    User user = userRepository.findByIdAndDomainId(userId, domainId)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+    userRepository.delete(user);
+  }
+
+  private UserResponse registerInternal(Domain domain, UserRegistrationRequest request) {
+    Long domainId = domain.getId();
+    if (userRepository.existsByDomainIdAndEmail(domainId, request.email())) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists in domain");
+    }
+
+    User user = User.builder()
+        .domain(domain)
+        .email(request.email())
+        .passwordHash(passwordEncoder.encode(requirePassword(request.password())))
+        .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
+        .build();
+
+    applyProfileValues(user, domainId, request.values());
+    String otpCode = userOtpService.createVerificationCode(user);
+
+    User saved = userRepository.save(user);
+    emailService.sendOtpEmail(saved.getEmail(), otpCode);
+    return toResponse(saved);
+  }
+
+  private UserResponse updateInternal(User user, Long domainId, UserUpdateRequest request, boolean allowConfirmed) {
+    if (!allowConfirmed && request.confirmed() != null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Confirmed flag is not allowed");
+    }
 
     boolean emailChanged = false;
     if (request.password() != null && !request.password().isBlank()) {
@@ -126,7 +156,7 @@ public class UserService {
       user.setEmail(request.email());
     }
 
-    if (request.confirmed() != null) {
+    if (allowConfirmed && request.confirmed() != null) {
       if (request.confirmed()) {
         user.setEmailVerifiedAt(OffsetDateTime.now(ZoneOffset.UTC));
       } else {
@@ -140,7 +170,7 @@ public class UserService {
     }
 
     String otpCode = null;
-    if (emailChanged && (request.confirmed() == null || !request.confirmed())) {
+    if (emailChanged && (!allowConfirmed || request.confirmed() == null || !request.confirmed())) {
       user.setEmailVerifiedAt(null);
       otpCode = userOtpService.createVerificationCode(user);
     }
@@ -150,13 +180,6 @@ public class UserService {
       emailService.sendOtpEmail(saved.getEmail(), otpCode);
     }
     return toResponse(saved);
-  }
-
-  public void delete(Long serviceUserId, Long domainId, Long userId) {
-    accessService.requireDomainAccess(serviceUserId, domainId);
-    User user = userRepository.findByIdAndDomainId(userId, domainId)
-        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
-    userRepository.delete(user);
   }
 
   private Map<Long, ProfileField> toFieldMap(List<ProfileField> fields) {

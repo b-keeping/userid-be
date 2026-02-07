@@ -1,7 +1,6 @@
 package com.userid.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.userid.api.domain.DomainJwtSecretResponse;
 import com.userid.api.domain.DomainRequest;
 import com.userid.api.domain.DomainResponse;
 import com.userid.api.domain.DomainUpdateRequest;
@@ -191,18 +190,6 @@ public class DomainService {
     }
 
     return toResponse(domainRepository.save(domain));
-  }
-
-  public DomainJwtSecretResponse getUserJwtSecret(Long ownerId, Long domainId) {
-    accessService.requireDomainAccess(ownerId, domainId);
-    String secret = domainJwtSecretService.getOrCreateSecret(domainId);
-    return new DomainJwtSecretResponse(domainId, secret);
-  }
-
-  public DomainJwtSecretResponse rotateUserJwtSecret(Long ownerId, Long domainId) {
-    accessService.requireDomainAccess(ownerId, domainId);
-    String secret = domainJwtSecretService.rotateSecret(domainId);
-    return new DomainJwtSecretResponse(domainId, secret);
   }
 
   @Transactional

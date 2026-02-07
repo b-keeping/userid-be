@@ -1,6 +1,5 @@
 package com.userid.security;
 
-import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -15,11 +14,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 @Component
-public class JwtAuthenticationFilter extends OncePerRequestFilter {
-  private final JwtService jwtService;
+public class DomainApiAuthenticationFilter extends OncePerRequestFilter {
+  private final DomainApiJwtService domainApiJwtService;
 
-  public JwtAuthenticationFilter(JwtService jwtService) {
-    this.jwtService = jwtService;
+  public DomainApiAuthenticationFilter(DomainApiJwtService domainApiJwtService) {
+    this.domainApiJwtService = domainApiJwtService;
   }
 
   @Override
@@ -33,6 +32,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       return;
     }
 
+    String path = request.getRequestURI();
+    if (path == null || !path.startsWith("/api/external/")) {
+      filterChain.doFilter(request, response);
+      return;
+    }
+
     String header = request.getHeader(HttpHeaders.AUTHORIZATION);
     if (header == null || !header.startsWith("Bearer ")) {
       filterChain.doFilter(request, response);
@@ -40,19 +45,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     String token = header.substring(7).trim();
-    if (token.isEmpty()) {
-      filterChain.doFilter(request, response);
-      return;
-    }
-
-    try {
-      AuthPrincipal principal = jwtService.parseToken(token);
-      var authorities = List.of(new SimpleGrantedAuthority("ROLE_" + principal.role().name()));
-      var authentication = new UsernamePasswordAuthenticationToken(principal, token, authorities);
-      SecurityContextHolder.getContext().setAuthentication(authentication);
-    } catch (JwtException | IllegalArgumentException ex) {
-      filterChain.doFilter(request, response);
-      return;
+    if (!token.isEmpty()) {
+      try {
+        DomainApiPrincipal principal = domainApiJwtService.parseToken(token);
+        var authorities = List.of(new SimpleGrantedAuthority("ROLE_DOMAIN_API"));
+        var authentication = new UsernamePasswordAuthenticationToken(principal, token, authorities);
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+      } catch (RuntimeException ex) {
+        // ignore invalid domain API token, fallback to other auth mechanisms
+      }
     }
 
     filterChain.doFilter(request, response);

@@ -11,9 +11,14 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 public class SecurityConfig {
   private final JwtAuthenticationFilter jwtAuthenticationFilter;
+  private final DomainApiAuthenticationFilter domainApiAuthenticationFilter;
 
-  public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+  public SecurityConfig(
+      JwtAuthenticationFilter jwtAuthenticationFilter,
+      DomainApiAuthenticationFilter domainApiAuthenticationFilter
+  ) {
     this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+    this.domainApiAuthenticationFilter = domainApiAuthenticationFilter;
   }
 
   @Bean
@@ -22,19 +27,16 @@ public class SecurityConfig {
         .csrf(csrf -> csrf.disable())
         .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(auth -> auth
+            .requestMatchers(HttpMethod.PUT, "/api/external/domains/*/users/me").permitAll()
+            .requestMatchers("/api/external/domains/*/users/**").hasRole("DOMAIN_API")
             .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/auth/register").permitAll()
             .requestMatchers(HttpMethod.GET, "/api/auth/confirm").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/auth/forgot-password").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/auth/reset-password").permitAll()
-            .requestMatchers(HttpMethod.POST, "/api/domains/*/users/login").permitAll()
-            .requestMatchers(HttpMethod.POST, "/api/domains/*/users/confirm").permitAll()
-            .requestMatchers(HttpMethod.POST, "/api/domains/*/users/forgot-password").permitAll()
-            .requestMatchers(HttpMethod.POST, "/api/domains/*/users/reset-password").permitAll()
-            .requestMatchers(HttpMethod.POST, "/api/domains/*/users/resend-verification").permitAll()
-            .requestMatchers(HttpMethod.PUT, "/api/domains/*/users/me").permitAll()
             .anyRequest().authenticated()
         )
+        .addFilterBefore(domainApiAuthenticationFilter, JwtAuthenticationFilter.class)
         .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
     return http.build();
