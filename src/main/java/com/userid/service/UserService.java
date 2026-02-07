@@ -132,7 +132,7 @@ public class UserService {
     String otpCode = userOtpService.createVerificationCode(user);
 
     User saved = userRepository.save(user);
-    emailService.sendOtpEmail(saved.getEmail(), otpCode);
+    emailService.sendOtpEmail(domain, saved.getEmail(), otpCode);
     return toResponse(saved);
   }
 
@@ -177,7 +177,7 @@ public class UserService {
 
     User saved = userRepository.save(user);
     if (otpCode != null) {
-      emailService.sendOtpEmail(saved.getEmail(), otpCode);
+      emailService.sendOtpEmail(user.getDomain(), saved.getEmail(), otpCode);
     }
     return toResponse(saved);
   }

@@ -290,6 +290,14 @@ public class DomainService {
         applyRecord(findRecord(records, "mx"), domain::setMx, domain::setMxHost, domain::setMxType, domain::setMxPriority, domain::setMxOptional, null);
         log.info("DNS records saved domainId={}", domain.getId());
       }
+      if (response.ok() && response.smtp() != null) {
+        String smtpKey = response.smtp().path("key").asText(null);
+        if (smtpKey != null && !smtpKey.isBlank()) {
+          domain.setSmtpUsername(smtpKey);
+          domain.setSmtpPassword(smtpKey);
+          log.info("SMTP credentials saved domainId={}", domain.getId());
+        }
+      }
       domain.setVerifyStt(false);
       domain.setSpfStt(false);
       domain.setDkimStt(false);

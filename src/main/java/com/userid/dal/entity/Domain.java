@@ -103,6 +103,12 @@ public class Domain {
   @Column(name = "return_path_stt")
   private Boolean returnPathStt;
 
+  @Column(name = "smtp_username", length = 255)
+  private String smtpUsername;
+
+  @Column(name = "smtp_password", length = 255)
+  private String smtpPassword;
+
   @Column(name = "user_jwt_secret", length = 128)
   private String userJwtSecret;
 

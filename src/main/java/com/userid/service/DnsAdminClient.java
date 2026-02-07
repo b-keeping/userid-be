@@ -59,8 +59,16 @@ public class DnsAdminClient {
     JsonNode root = postJson("/provision", payload);
     boolean ok = root.path("ok").asBoolean(false);
     JsonNode records = root.path("records").isMissingNode() ? null : root.path("records");
+    JsonNode credentials = root.path("credentials").isMissingNode() ? null : root.path("credentials");
+    JsonNode smtp = null;
+    if (credentials != null && !credentials.isMissingNode()) {
+      smtp = credentials.path("smtp");
+      if (smtp.isMissingNode()) {
+        smtp = null;
+      }
+    }
     String error = root.path("error").asText(null);
-    return new ProvisionResponse(ok, records, error);
+    return new ProvisionResponse(ok, records, smtp, error);
   }
 
   public VerifyCheckResponse verifyCheck(String organization, String server, String domain) {
@@ -119,6 +127,7 @@ public class DnsAdminClient {
   public record ProvisionResponse(
       boolean ok,
       JsonNode records,
+      JsonNode smtp,
       String error
   ) {}
 

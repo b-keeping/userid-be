@@ -68,7 +68,7 @@ public class DomainUserAuthService {
     }
     String code = userOtpService.createResetCode(user);
     userRepository.save(user);
-    emailService.sendUserPasswordResetCode(user.getEmail(), code);
+    emailService.sendUserPasswordResetCode(user.getDomain(), user.getEmail(), code);
     return new ApiMessage("ok");
   }
 
@@ -107,7 +107,7 @@ public class DomainUserAuthService {
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     String code = userOtpService.createVerificationCode(user);
     userRepository.save(user);
-    emailService.sendOtpEmail(user.getEmail(), code);
+    emailService.sendOtpEmail(user.getDomain(), user.getEmail(), code);
     return new ApiMessage("ok");
   }
 
