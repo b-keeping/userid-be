@@ -7,5 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface UserRepository extends JpaRepository<User, Long>, UserRepositoryCustom {
   Optional<User> findByIdAndDomainId(Long id, Long domainId);
 
+  Optional<User> findByDomainIdAndEmail(Long domainId, String email);
+
   boolean existsByDomainIdAndEmail(Long domainId, String email);
 }

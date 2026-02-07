@@ -1,12 +1,11 @@
 package com.userid.api.user;
 
 import java.time.OffsetDateTime;
-import java.util.List;
 
-public record UserResponse(
+public record UserAuthResponse(
     Long id,
+    Long domainId,
     String email,
     boolean confirmed,
-    OffsetDateTime createdAt,
-    List<UserProfileValueResponse> values
+    OffsetDateTime createdAt
 ) {}

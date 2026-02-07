@@ -103,6 +103,9 @@ public class Domain {
   @Column(name = "return_path_stt")
   private Boolean returnPathStt;
 
+  @Column(name = "user_jwt_secret", length = 128)
+  private String userJwtSecret;
+
   @Builder.Default
   @OneToMany(mappedBy = "domain", cascade = CascadeType.ALL, orphanRemoval = true)
   private Set<ProfileField> profileFields = new HashSet<>();

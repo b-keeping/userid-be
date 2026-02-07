@@ -6,5 +6,6 @@ import java.util.List;
 public record UserUpdateRequest(
     String password,
     @Email String email,
-    List<UserProfileValueRequest> values
+    List<UserProfileValueRequest> values,
+    Boolean confirmed
 ) {}

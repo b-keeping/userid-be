@@ -1,6 +1,7 @@
 package com.userid.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.userid.api.domain.DomainJwtSecretResponse;
 import com.userid.api.domain.DomainRequest;
 import com.userid.api.domain.DomainResponse;
 import com.userid.api.domain.DomainUpdateRequest;
@@ -32,6 +33,7 @@ public class DomainService {
   private final OwnerRepository ownerRepository;
   private final AccessService accessService;
   private final DnsAdminClient dnsAdminClient;
+  private final DomainJwtSecretService domainJwtSecretService;
   @org.springframework.beans.factory.annotation.Value("${auth.dns-admin.organization:Org1}")
   private String dnsOrganization;
   @org.springframework.beans.factory.annotation.Value("${auth.dns-admin.server:srv1}")
@@ -65,6 +67,7 @@ public class DomainService {
 
     Domain saved = domainRepository.save(domain);
     log.info("Domain created id={} name={}", saved.getId(), saved.getName());
+    domainJwtSecretService.getOrCreateSecret(saved);
     if (requester.getRole() == OwnerRole.ADMIN) {
       if (ownerDomainRepository.existsByDomainId(saved.getId())) {
         throw new ResponseStatusException(HttpStatus.CONFLICT, "Domain already has owner");
@@ -188,6 +191,18 @@ public class DomainService {
     }
 
     return toResponse(domainRepository.save(domain));
+  }
+
+  public DomainJwtSecretResponse getUserJwtSecret(Long ownerId, Long domainId) {
+    accessService.requireDomainAccess(ownerId, domainId);
+    String secret = domainJwtSecretService.getOrCreateSecret(domainId);
+    return new DomainJwtSecretResponse(domainId, secret);
+  }
+
+  public DomainJwtSecretResponse rotateUserJwtSecret(Long ownerId, Long domainId) {
+    accessService.requireDomainAccess(ownerId, domainId);
+    String secret = domainJwtSecretService.rotateSecret(domainId);
+    return new DomainJwtSecretResponse(domainId, secret);
   }
 
   @Transactional

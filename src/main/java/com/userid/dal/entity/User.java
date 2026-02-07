@@ -60,6 +60,21 @@ public class User {
   @Column(name = "created_at", nullable = false)
   private OffsetDateTime createdAt;
 
+  @Column(name = "email_verified_at")
+  private OffsetDateTime emailVerifiedAt;
+
+  @Column(name = "otp_hash", length = 255)
+  private String otpHash;
+
+  @Column(name = "otp_expires_at")
+  private OffsetDateTime otpExpiresAt;
+
+  @Column(name = "reset_hash", length = 255)
+  private String resetHash;
+
+  @Column(name = "reset_expires_at")
+  private OffsetDateTime resetExpiresAt;
+
   @Builder.Default
   @Column(name = "profile_jsonb", nullable = false, columnDefinition = "jsonb")
   @JdbcTypeCode(SqlTypes.JSON)

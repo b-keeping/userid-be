@@ -1,0 +1,139 @@
+package com.userid.service;
+
+import com.userid.api.common.ApiMessage;
+import com.userid.api.user.UserAuthResponse;
+import com.userid.api.user.UserConfirmRequest;
+import com.userid.api.user.UserForgotPasswordRequest;
+import com.userid.api.user.UserLoginRequest;
+import com.userid.api.user.UserLoginResponse;
+import com.userid.api.user.UserResetPasswordRequest;
+import com.userid.api.user.UserResponse;
+import com.userid.api.user.UserSelfUpdateRequest;
+import com.userid.dal.entity.User;
+import com.userid.dal.repo.UserRepository;
+import com.userid.security.DomainUserJwtService;
+import com.userid.security.DomainUserPrincipal;
+import jakarta.servlet.http.HttpServletRequest;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+
+@Service
+@RequiredArgsConstructor
+public class DomainUserAuthService {
+  private final UserRepository userRepository;
+  private final PasswordEncoder passwordEncoder;
+  private final DomainUserJwtService domainUserJwtService;
+  private final UserOtpService userOtpService;
+  private final EmailService emailService;
+  private final UserService userService;
+
+  public UserLoginResponse login(Long domainId, UserLoginRequest request) {
+    User user = userRepository.findByDomainIdAndEmail(domainId, request.email())
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+    if (user.getEmailVerifiedAt() == null) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Email is not confirmed");
+    }
+    if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
+    }
+
+    String token = domainUserJwtService.generateToken(user);
+    return new UserLoginResponse(token, toAuthResponse(user));
+  }
+
+  public ApiMessage confirm(Long domainId, UserConfirmRequest request) {
+    User user = userRepository.findByDomainIdAndEmail(domainId, request.email())
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+    if (!userOtpService.verifyCode(user, request.code())) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or expired code");
+    }
+    user.setEmailVerifiedAt(OffsetDateTime.now(ZoneOffset.UTC));
+    userOtpService.clearVerificationCode(user);
+    userRepository.save(user);
+    return new ApiMessage("ok");
+  }
+
+  public ApiMessage forgotPassword(Long domainId, UserForgotPasswordRequest request) {
+    User user = userRepository.findByDomainIdAndEmail(domainId, request.email())
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+    if (user.getEmailVerifiedAt() == null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is not confirmed");
+    }
+    String code = userOtpService.createResetCode(user);
+    userRepository.save(user);
+    emailService.sendUserPasswordResetCode(user.getEmail(), code);
+    return new ApiMessage("ok");
+  }
+
+  public ApiMessage resetPassword(Long domainId, UserResetPasswordRequest request) {
+    User user = userRepository.findByDomainIdAndEmail(domainId, request.email())
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+    if (!userOtpService.verifyResetCode(user, request.code())) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or expired code");
+    }
+    user.setPasswordHash(passwordEncoder.encode(request.password()));
+    userOtpService.clearResetCode(user);
+    userRepository.save(user);
+    return new ApiMessage("ok");
+  }
+
+  public UserResponse updateSelf(Long domainId, HttpServletRequest request, UserSelfUpdateRequest body) {
+    DomainUserPrincipal principal = parsePrincipal(request);
+    if (!principal.domainId().equals(domainId)) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Domain mismatch");
+    }
+    User user = userRepository.findByIdAndDomainId(principal.id(), domainId)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+    if (body.password() != null && !body.password().isBlank()) {
+      user.setPasswordHash(passwordEncoder.encode(body.password()));
+    }
+    if (body.values() != null) {
+      userService.applyProfileValues(user, domainId, body.values());
+    }
+    User saved = userRepository.save(user);
+    return userService.toResponse(saved);
+  }
+
+  public ApiMessage resendVerification(Long domainId, UserForgotPasswordRequest request) {
+    User user = userRepository.findByDomainIdAndEmail(domainId, request.email())
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+    String code = userOtpService.createVerificationCode(user);
+    userRepository.save(user);
+    emailService.sendOtpEmail(user.getEmail(), code);
+    return new ApiMessage("ok");
+  }
+
+  private DomainUserPrincipal parsePrincipal(HttpServletRequest request) {
+    String header = request.getHeader(HttpHeaders.AUTHORIZATION);
+    if (header == null || !header.startsWith("Bearer ")) {
+      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing token");
+    }
+    String token = header.substring(7).trim();
+    if (token.isEmpty()) {
+      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing token");
+    }
+    try {
+      return domainUserJwtService.parseToken(token);
+    } catch (Exception ex) {
+      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token");
+    }
+  }
+
+  private UserAuthResponse toAuthResponse(User user) {
+    return new UserAuthResponse(
+        user.getId(),
+        user.getDomain().getId(),
+        user.getEmail(),
+        user.getEmailVerifiedAt() != null,
+        user.getCreatedAt()
+    );
+  }
+}

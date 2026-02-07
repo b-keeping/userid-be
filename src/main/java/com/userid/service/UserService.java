@@ -43,51 +43,13 @@ public class UserService {
   private final AccessService accessService;
   private final ObjectMapper objectMapper;
   private final PasswordEncoder passwordEncoder;
+  private final EmailService emailService;
+  private final UserOtpService userOtpService;
 
   public UserResponse register(Long serviceUserId, Long domainId, UserRegistrationRequest request) {
     accessService.requireDomainAccess(serviceUserId, domainId);
     Domain domain = domainRepository.findById(domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found"));
-
-    List<ProfileField> fields = profileFieldRepository.findByDomainId(domainId);
-    Map<Long, ProfileField> fieldById = toFieldMap(fields);
-
-    List<UserProfileValueRequest> valueRequests =
-        request.values() == null ? List.of() : request.values();
-
-    Set<Long> providedFieldIds = new HashSet<>();
-    List<UserProfileValue> values = new ArrayList<>();
-
-    for (UserProfileValueRequest valueRequest : valueRequests) {
-      Long fieldId = valueRequest.fieldId();
-      if (fieldId == null) {
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Profile field id is required");
-      }
-      ProfileField field = fieldById.get(fieldId);
-      if (field == null) {
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown profile field id: " + fieldId);
-      }
-      if (!providedFieldIds.add(fieldId)) {
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Duplicate profile field id: " + fieldId);
-      }
-
-      UserProfileValue value = new UserProfileValue();
-      value.setField(field);
-      applyValue(value, field.getType(), valueRequest);
-      values.add(value);
-    }
-
-    List<String> missingMandatory = fields.stream()
-        .filter(field -> field.isMandatory() && !providedFieldIds.contains(field.getId()))
-        .map(ProfileField::getName)
-        .toList();
-
-    if (!missingMandatory.isEmpty()) {
-      throw new ResponseStatusException(
-          HttpStatus.BAD_REQUEST,
-          "Missing mandatory fields: " + String.join(", ", missingMandatory)
-      );
-    }
 
     if (userRepository.existsByDomainIdAndEmail(domainId, request.email())) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists in domain");
@@ -100,14 +62,11 @@ public class UserService {
         .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
         .build();
 
-    for (UserProfileValue value : values) {
-      value.setUser(user);
-      user.getValues().add(value);
-    }
-
-    user.setProfileJsonb(serializeProfile(values));
+    applyProfileValues(user, domainId, request.values());
+    String otpCode = userOtpService.createVerificationCode(user);
 
     User saved = userRepository.save(user);
+    emailService.sendOtpEmail(saved.getEmail(), otpCode);
     return toResponse(saved);
   }
 
@@ -152,6 +111,7 @@ public class UserService {
     User user = userRepository.findByIdAndDomainId(userId, domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
+    boolean emailChanged = false;
     if (request.password() != null && !request.password().isBlank()) {
       user.setPasswordHash(passwordEncoder.encode(request.password()));
     }
@@ -160,57 +120,35 @@ public class UserService {
           && userRepository.existsByDomainIdAndEmail(domainId, request.email())) {
         throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists in domain");
       }
+      if (!request.email().equals(user.getEmail())) {
+        emailChanged = true;
+      }
       user.setEmail(request.email());
     }
 
+    if (request.confirmed() != null) {
+      if (request.confirmed()) {
+        user.setEmailVerifiedAt(OffsetDateTime.now(ZoneOffset.UTC));
+      } else {
+        user.setEmailVerifiedAt(null);
+        userOtpService.clearVerificationCode(user);
+      }
+    }
+
     if (request.values() != null) {
-      List<ProfileField> fields = profileFieldRepository.findByDomainId(domainId);
-      Map<Long, ProfileField> fieldById = toFieldMap(fields);
+      applyProfileValues(user, domainId, request.values());
+    }
 
-      Set<Long> providedFieldIds = new HashSet<>();
-      List<UserProfileValue> values = new ArrayList<>();
-
-      for (UserProfileValueRequest valueRequest : request.values()) {
-        Long fieldId = valueRequest.fieldId();
-        if (fieldId == null) {
-          throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Profile field id is required");
-        }
-        ProfileField field = fieldById.get(fieldId);
-        if (field == null) {
-          throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown profile field id: " + fieldId);
-        }
-        if (!providedFieldIds.add(fieldId)) {
-          throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Duplicate profile field id: " + fieldId);
-        }
-
-        UserProfileValue value = new UserProfileValue();
-        value.setField(field);
-        applyValue(value, field.getType(), valueRequest);
-        values.add(value);
-      }
-
-      List<String> missingMandatory = fields.stream()
-          .filter(field -> field.isMandatory() && !providedFieldIds.contains(field.getId()))
-          .map(ProfileField::getName)
-          .toList();
-
-      if (!missingMandatory.isEmpty()) {
-        throw new ResponseStatusException(
-            HttpStatus.BAD_REQUEST,
-            "Missing mandatory fields: " + String.join(", ", missingMandatory)
-        );
-      }
-
-      user.getValues().clear();
-      for (UserProfileValue value : values) {
-        value.setUser(user);
-        user.getValues().add(value);
-      }
-
-      user.setProfileJsonb(serializeProfile(values));
+    String otpCode = null;
+    if (emailChanged && (request.confirmed() == null || !request.confirmed())) {
+      user.setEmailVerifiedAt(null);
+      otpCode = userOtpService.createVerificationCode(user);
     }
 
     User saved = userRepository.save(user);
+    if (otpCode != null) {
+      emailService.sendOtpEmail(saved.getEmail(), otpCode);
+    }
     return toResponse(saved);
   }
 
@@ -227,6 +165,63 @@ public class UserService {
       fieldById.put(field.getId(), field);
     }
     return fieldById;
+  }
+
+  void applyProfileValues(User user, Long domainId, List<UserProfileValueRequest> requests) {
+    List<ProfileField> fields = profileFieldRepository.findByDomainId(domainId);
+    Map<Long, ProfileField> fieldById = toFieldMap(fields);
+    List<UserProfileValueRequest> valueRequests = requests == null ? List.of() : requests;
+
+    Set<Long> providedFieldIds = new HashSet<>();
+    List<UserProfileValue> values = new ArrayList<>();
+    List<Long> unknownFieldIds = new ArrayList<>();
+
+    for (UserProfileValueRequest valueRequest : valueRequests) {
+      Long fieldId = valueRequest.fieldId();
+      if (fieldId == null) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Profile field id is required");
+      }
+      ProfileField field = fieldById.get(fieldId);
+      if (field == null) {
+        unknownFieldIds.add(fieldId);
+        continue;
+      }
+      if (!providedFieldIds.add(fieldId)) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Duplicate profile field id: " + fieldId);
+      }
+
+      UserProfileValue value = new UserProfileValue();
+      value.setField(field);
+      applyValue(value, field.getType(), valueRequest);
+      values.add(value);
+    }
+
+    if (!unknownFieldIds.isEmpty()) {
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST,
+          "Unknown profile field id(s): " + unknownFieldIds.stream().map(String::valueOf).collect(Collectors.joining(", "))
+      );
+    }
+
+    List<String> missingMandatory = fields.stream()
+        .filter(field -> field.isMandatory() && !providedFieldIds.contains(field.getId()))
+        .map(ProfileField::getName)
+        .toList();
+
+    if (!missingMandatory.isEmpty()) {
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST,
+          "Missing mandatory fields: " + String.join(", ", missingMandatory)
+      );
+    }
+
+    user.getValues().clear();
+    for (UserProfileValue value : values) {
+      value.setUser(user);
+      user.getValues().add(value);
+    }
+
+    user.setProfileJsonb(serializeProfile(values));
   }
 
   private void applyValue(UserProfileValue value, FieldType type, UserProfileValueRequest request) {
@@ -281,7 +276,7 @@ public class UserService {
     };
   }
 
-  private UserResponse toResponse(User user) {
+  UserResponse toResponse(User user) {
     List<UserProfileValueResponse> values = parseProfile(user.getProfileJsonb());
     if (values == null) {
       values = user.getValues().stream()
@@ -292,7 +287,8 @@ public class UserService {
           .collect(Collectors.toList());
     }
 
-    return new UserResponse(user.getId(), user.getEmail(), user.getCreatedAt(), values);
+    boolean confirmed = user.getEmailVerifiedAt() != null;
+    return new UserResponse(user.getId(), user.getEmail(), confirmed, user.getCreatedAt(), values);
   }
 
   private UserProfileValueResponse toResponse(UserProfileValue value) {

@@ -35,4 +35,22 @@ public class EmailService {
     message.setText("Для сброса пароля перейдите по ссылке:\n" + link);
     mailSender.send(message);
   }
+
+  public void sendOtpEmail(String to, String code) {
+    SimpleMailMessage message = new SimpleMailMessage();
+    message.setTo(to);
+    message.setFrom(fromAddress);
+    message.setSubject("Код подтверждения");
+    message.setText("Ваш код подтверждения: " + code);
+    mailSender.send(message);
+  }
+
+  public void sendUserPasswordResetCode(String to, String code) {
+    SimpleMailMessage message = new SimpleMailMessage();
+    message.setTo(to);
+    message.setFrom(fromAddress);
+    message.setSubject("Код для сброса пароля");
+    message.setText("Ваш код для сброса пароля: " + code);
+    mailSender.send(message);
+  }
 }
