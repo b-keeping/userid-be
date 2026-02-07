@@ -6,6 +6,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -15,6 +17,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 @Component
 public class DomainApiAuthenticationFilter extends OncePerRequestFilter {
+  private static final Logger log = LoggerFactory.getLogger(DomainApiAuthenticationFilter.class);
   private final DomainApiJwtService domainApiJwtService;
 
   public DomainApiAuthenticationFilter(DomainApiJwtService domainApiJwtService) {
@@ -52,7 +55,7 @@ public class DomainApiAuthenticationFilter extends OncePerRequestFilter {
         var authentication = new UsernamePasswordAuthenticationToken(principal, token, authorities);
         SecurityContextHolder.getContext().setAuthentication(authentication);
       } catch (RuntimeException ex) {
-        // ignore invalid domain API token, fallback to other auth mechanisms
+        log.warn("Domain API token rejected path={} reason={}", path, ex.getMessage());
       }
     }
 
