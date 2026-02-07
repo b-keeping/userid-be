@@ -1,7 +1,9 @@
 package com.userid.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.userid.api.domain.DomainApiTokenResponse;
 import com.userid.api.domain.DomainRequest;
+import com.userid.api.domain.DomainJwtSecretResponse;
 import com.userid.api.domain.DomainResponse;
 import com.userid.api.domain.DomainUpdateRequest;
 import com.userid.dal.entity.Domain;
@@ -33,6 +35,7 @@ public class DomainService {
   private final AccessService accessService;
   private final DnsAdminClient dnsAdminClient;
   private final DomainJwtSecretService domainJwtSecretService;
+  private final DomainApiTokenService domainApiTokenService;
   @org.springframework.beans.factory.annotation.Value("${auth.dns-admin.organization:Org1}")
   private String dnsOrganization;
   @org.springframework.beans.factory.annotation.Value("${auth.dns-admin.server:srv1}")
@@ -190,6 +193,23 @@ public class DomainService {
     }
 
     return toResponse(domainRepository.save(domain));
+  }
+
+  public DomainJwtSecretResponse getUserJwtSecret(Long ownerId, Long domainId) {
+    accessService.requireDomainAccess(ownerId, domainId);
+    String secret = domainJwtSecretService.getOrCreateSecret(domainId);
+    return new DomainJwtSecretResponse(domainId, secret);
+  }
+
+  public DomainJwtSecretResponse rotateUserJwtSecret(Long ownerId, Long domainId) {
+    accessService.requireDomainAccess(ownerId, domainId);
+    String secret = domainJwtSecretService.rotateSecret(domainId);
+    return new DomainJwtSecretResponse(domainId, secret);
+  }
+
+  public DomainApiTokenResponse generateDomainApiToken(Long ownerId, Long domainId, Long expiresSeconds) {
+    accessService.requireDomainAccess(ownerId, domainId);
+    return domainApiTokenService.generate(domainId, expiresSeconds);
   }
 
   @Transactional

@@ -171,6 +171,7 @@ public class OwnerAuthService {
     ownerRepository.save(user);
   }
 
+
   private OwnerResponse toResponse(Owner user) {
     List<Long> domainIds;
     if (user.getRole() == OwnerRole.ADMIN) {

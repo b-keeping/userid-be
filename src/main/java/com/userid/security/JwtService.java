@@ -31,13 +31,17 @@ public class JwtService {
   }
 
   public String generateToken(Owner user) {
+    return generateToken(user, expiration);
+  }
+
+  public String generateToken(Owner user, Duration customExpiration) {
     Instant now = Instant.now();
     return Jwts.builder()
         .subject(String.valueOf(user.getId()))
         .claim("role", user.getRole().name())
         .claim("email", user.getEmail())
         .issuedAt(Date.from(now))
-        .expiration(Date.from(now.plus(expiration)))
+        .expiration(Date.from(now.plus(customExpiration)))
         .signWith(secretKey)
         .compact();
   }

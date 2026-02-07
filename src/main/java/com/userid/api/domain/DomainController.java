@@ -1,6 +1,9 @@
 package com.userid.api.domain;
 
 import com.userid.api.common.ApiMessage;
+import com.userid.api.domain.DomainApiTokenRequest;
+import com.userid.api.domain.DomainApiTokenResponse;
+import com.userid.api.domain.DomainJwtSecretResponse;
 import com.userid.security.AuthPrincipal;
 import com.userid.service.DomainService;
 import jakarta.validation.Valid;
@@ -60,6 +63,32 @@ public class DomainController {
       @PathVariable Long domainId
   ) {
     return domainService.verifyDomain(principal.id(), domainId);
+  }
+
+  @GetMapping("/{domainId}/user-jwt-secret")
+  public DomainJwtSecretResponse getUserJwtSecret(
+      @AuthenticationPrincipal AuthPrincipal principal,
+      @PathVariable Long domainId
+  ) {
+    return domainService.getUserJwtSecret(principal.id(), domainId);
+  }
+
+  @PostMapping("/{domainId}/user-jwt-secret/rotate")
+  public DomainJwtSecretResponse rotateUserJwtSecret(
+      @AuthenticationPrincipal AuthPrincipal principal,
+      @PathVariable Long domainId
+  ) {
+    return domainService.rotateUserJwtSecret(principal.id(), domainId);
+  }
+
+  @PostMapping("/{domainId}/domain-api-token")
+  public DomainApiTokenResponse domainApiToken(
+      @AuthenticationPrincipal AuthPrincipal principal,
+      @PathVariable Long domainId,
+      @RequestBody DomainApiTokenRequest request
+  ) {
+    Long expiresSeconds = request == null ? null : request.expiresSeconds();
+    return domainService.generateDomainApiToken(principal.id(), domainId, expiresSeconds);
   }
 
   @DeleteMapping("/{domainId}")
