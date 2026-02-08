@@ -59,13 +59,15 @@ public class DnsAdminClient {
     JsonNode root = postJson("/provision", payload);
     boolean ok = root.path("ok").asBoolean(false);
     JsonNode records = root.path("records").isMissingNode() ? null : root.path("records");
-    JsonNode credentials = root.path("credentials").isMissingNode() ? null : root.path("credentials");
-    JsonNode smtp = null;
-    if (credentials != null && !credentials.isMissingNode()) {
-      smtp = credentials.path("smtp");
-      if (smtp.isMissingNode()) {
-        smtp = null;
+    JsonNode smtp = root.path("smtp");
+    if (smtp.isMissingNode()) {
+      JsonNode credentials = root.path("credentials");
+      if (!credentials.isMissingNode()) {
+        smtp = credentials.path("smtp");
       }
+    }
+    if (smtp.isMissingNode()) {
+      smtp = null;
     }
     String error = root.path("error").asText(null);
     return new ProvisionResponse(ok, records, smtp, error);

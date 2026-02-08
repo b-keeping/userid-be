@@ -314,10 +314,7 @@ public class DomainService {
     if (domainName != null && !domainName.isBlank()) {
       return domainName;
     }
-    if (domainId != null) {
-      return "srv-" + domainId;
-    }
-    return fallback;
+    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Domain name is required");
   }
 
   private void applyRecord(
