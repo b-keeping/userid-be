@@ -7,6 +7,8 @@ import com.userid.api.auth.OwnerPasswordResetConfirmRequest;
 import com.userid.api.auth.OwnerPasswordResetRequest;
 import com.userid.api.owner.OwnerResponse;
 import com.userid.dal.entity.Owner;
+import com.userid.dal.entity.OtpOwner;
+import com.userid.dal.entity.OtpType;
 import com.userid.dal.entity.OwnerRole;
 import com.userid.dal.repo.OwnerDomainRepository;
 import com.userid.dal.repo.OwnerRepository;
@@ -15,7 +17,6 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -30,10 +31,9 @@ public class OwnerAuthService {
   private final PasswordEncoder passwordEncoder;
   private final JwtService jwtService;
   private final EmailService emailService;
+  private final OwnerOtpService ownerOtpService;
   private final String verifyBaseUrl;
   private final String resetBaseUrl;
-  private final long verificationHours;
-  private final long resetHours;
 
   public OwnerAuthService(
       OwnerRepository ownerRepository,
@@ -41,20 +41,18 @@ public class OwnerAuthService {
       PasswordEncoder passwordEncoder,
       JwtService jwtService,
       EmailService emailService,
+      OwnerOtpService ownerOtpService,
       @Value("${auth.email.verify-base-url}") String verifyBaseUrl,
-      @Value("${auth.email.reset-base-url}") String resetBaseUrl,
-      @Value("${auth.email.verification-hours:24}") long verificationHours,
-      @Value("${auth.email.reset-hours:2}") long resetHours
+      @Value("${auth.email.reset-base-url}") String resetBaseUrl
   ) {
     this.ownerRepository = ownerRepository;
     this.ownerDomainRepository = ownerDomainRepository;
     this.passwordEncoder = passwordEncoder;
     this.jwtService = jwtService;
     this.emailService = emailService;
+    this.ownerOtpService = ownerOtpService;
     this.verifyBaseUrl = verifyBaseUrl;
     this.resetBaseUrl = resetBaseUrl;
-    this.verificationHours = verificationHours;
-    this.resetHours = resetHours;
   }
 
   public OwnerLoginResponse login(OwnerLoginRequest request) {
@@ -76,22 +74,17 @@ public class OwnerAuthService {
   public OwnerResponse register(OwnerRegisterRequest request) {
     Owner existing = ownerRepository.findByEmail(request.email()).orElse(null);
 
-    String token = generateToken();
-    OffsetDateTime expiresAt = OffsetDateTime.now(ZoneOffset.UTC).plusHours(verificationHours);
-
     if (existing != null) {
       if (existing.isActive()) {
         throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists");
       }
       existing.setPasswordHash(passwordEncoder.encode(request.password()));
-      existing.setVerificationToken(token);
-      existing.setVerificationExpiresAt(expiresAt);
-      existing.setResetToken(null);
-      existing.setResetExpiresAt(null);
       existing.setActive(false);
       existing.setEmailVerifiedAt(null);
       Owner saved = ownerRepository.save(existing);
-      emailService.sendVerificationEmail(saved.getEmail(), buildVerificationLink(token));
+      ownerOtpService.clearResetCode(saved);
+      String code = ownerOtpService.createVerificationCode(saved);
+      emailService.sendVerificationEmail(saved.getEmail(), buildVerificationLink(code));
       return toResponse(saved);
     }
 
@@ -101,12 +94,11 @@ public class OwnerAuthService {
         .role(OwnerRole.USER)
         .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
         .active(false)
-        .verificationToken(token)
-        .verificationExpiresAt(expiresAt)
         .build();
 
     Owner saved = ownerRepository.save(user);
-    emailService.sendVerificationEmail(saved.getEmail(), buildVerificationLink(token));
+    String code = ownerOtpService.createVerificationCode(saved);
+    emailService.sendVerificationEmail(saved.getEmail(), buildVerificationLink(code));
     return toResponse(saved);
   }
 
@@ -115,23 +107,14 @@ public class OwnerAuthService {
     if (token == null || token.isBlank()) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Token is required");
     }
-    Owner user = ownerRepository.findByVerificationToken(token)
-        .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid token"));
-
-    if (user.isActive()) {
-      return;
+    OtpOwner otp = ownerOtpService.requireValid(OtpType.VERIFICATION, token);
+    Owner user = otp.getOwner();
+    if (!user.isActive()) {
+      user.setActive(true);
+      user.setEmailVerifiedAt(OffsetDateTime.now(ZoneOffset.UTC));
+      ownerRepository.save(user);
     }
-
-    OffsetDateTime expiresAt = user.getVerificationExpiresAt();
-    if (expiresAt != null && expiresAt.isBefore(OffsetDateTime.now(ZoneOffset.UTC))) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Token expired");
-    }
-
-    user.setActive(true);
-    user.setEmailVerifiedAt(OffsetDateTime.now(ZoneOffset.UTC));
-    user.setVerificationToken(null);
-    user.setVerificationExpiresAt(null);
-    ownerRepository.save(user);
+    ownerOtpService.clearVerificationCode(user);
   }
 
   @Transactional
@@ -142,33 +125,21 @@ public class OwnerAuthService {
     if (!user.isActive()) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is not confirmed");
     }
-
-    String token = generateToken();
-    OffsetDateTime expiresAt = OffsetDateTime.now(ZoneOffset.UTC).plusHours(resetHours);
-    user.setResetToken(token);
-    user.setResetExpiresAt(expiresAt);
+    String code = ownerOtpService.createResetCode(user);
     ownerRepository.save(user);
-    emailService.sendPasswordResetEmail(user.getEmail(), buildResetLink(token));
+    emailService.sendPasswordResetEmail(user.getEmail(), buildResetLink(code));
   }
 
   @Transactional
   public void resetPassword(OwnerPasswordResetConfirmRequest request) {
-    Owner user = ownerRepository.findByResetToken(request.token())
-        .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid token"));
-
-    OffsetDateTime expiresAt = user.getResetExpiresAt();
-    if (expiresAt != null && expiresAt.isBefore(OffsetDateTime.now(ZoneOffset.UTC))) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Token expired");
-    }
-
+    OtpOwner otp = ownerOtpService.requireValid(OtpType.RESET, request.token());
+    Owner user = otp.getOwner();
     if (!user.isActive()) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is not confirmed");
     }
-
     user.setPasswordHash(passwordEncoder.encode(request.password()));
-    user.setResetToken(null);
-    user.setResetExpiresAt(null);
     ownerRepository.save(user);
+    ownerOtpService.clearResetCode(user);
   }
 
 
@@ -206,7 +177,4 @@ public class OwnerAuthService {
     return resetBaseUrl + "?token=" + token;
   }
 
-  private static String generateToken() {
-    return UUID.randomUUID().toString().replace("-", "");
-  }
 }

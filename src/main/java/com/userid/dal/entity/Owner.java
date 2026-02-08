@@ -56,18 +56,6 @@ public class Owner {
   @Column(name = "email_verified_at")
   private OffsetDateTime emailVerifiedAt;
 
-  @Column(name = "verification_token", length = 80)
-  private String verificationToken;
-
-  @Column(name = "verification_expires_at")
-  private OffsetDateTime verificationExpiresAt;
-
-  @Column(name = "reset_token", length = 80)
-  private String resetToken;
-
-  @Column(name = "reset_expires_at")
-  private OffsetDateTime resetExpiresAt;
-
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 16)
   private OwnerRole role;

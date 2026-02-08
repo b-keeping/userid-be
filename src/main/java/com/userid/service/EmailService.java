@@ -1,6 +1,8 @@
 package com.userid.service;
 
 import com.userid.dal.entity.Domain;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Properties;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
@@ -26,6 +28,9 @@ public class EmailService {
   private final boolean smtpAuth;
   private final boolean smtpStartTls;
   private final String domainFromLocalPart;
+  private final String userLinkScheme;
+  private final String userVerifyPath;
+  private final String userResetPath;
 
   public EmailService(
       JavaMailSender mailSender,
@@ -38,6 +43,9 @@ public class EmailService {
       @Value("${spring.mail.properties.mail.smtp.auth:true}") boolean smtpAuth,
       @Value("${spring.mail.properties.mail.smtp.starttls.enable:true}") boolean smtpStartTls,
       @Value("${auth.email.domain-from-localpart:no-reply}") String domainFromLocalPart,
+      @Value("${auth.user.link-scheme:https}") String userLinkScheme,
+      @Value("${auth.user.verify-path:/verify}") String userVerifyPath,
+      @Value("${auth.user.reset-path:/reset}") String userResetPath,
       @Value("${auth.email.from:no-reply@userid.local}") String fromAddress
   ) {
     this.mailSender = mailSender;
@@ -51,6 +59,9 @@ public class EmailService {
     this.smtpAuth = smtpAuth;
     this.smtpStartTls = smtpStartTls;
     this.domainFromLocalPart = domainFromLocalPart;
+    this.userLinkScheme = userLinkScheme;
+    this.userVerifyPath = userVerifyPath;
+    this.userResetPath = userResetPath;
   }
 
   public void sendVerificationEmail(String to, String link) {
@@ -90,11 +101,13 @@ public class EmailService {
   }
 
   public void sendOtpEmail(Domain domain, String to, String code) {
-    sendWithDomain(domain, to, "Код подтверждения", "Ваш код подтверждения: " + code);
+    String link = buildDomainLink(domain, userVerifyPath, code);
+    sendWithDomain(domain, to, "Подтверждение регистрации", "Для подтверждения регистрации перейдите по ссылке:\n" + link);
   }
 
   public void sendUserPasswordResetCode(Domain domain, String to, String code) {
-    sendWithDomain(domain, to, "Код для сброса пароля", "Ваш код для сброса пароля: " + code);
+    String link = buildDomainLink(domain, userResetPath, code);
+    sendWithDomain(domain, to, "Сброс пароля", "Для сброса пароля перейдите по ссылке:\n" + link);
   }
 
   private void sendWithDomain(Domain domain, String to, String subject, String text) {
@@ -147,6 +160,20 @@ public class EmailService {
       return fromAddress;
     }
     return domainFromLocalPart + "@" + domain.getName();
+  }
+
+  private String buildDomainLink(Domain domain, String path, String code) {
+    if (domain == null || domain.getName() == null || domain.getName().isBlank()) {
+      return null;
+    }
+    String base = userLinkScheme + "://" + domain.getName();
+    String normalizedPath = path == null || path.isBlank() ? "/" : path;
+    if (!normalizedPath.startsWith("/")) {
+      normalizedPath = "/" + normalizedPath;
+    }
+    String separator = normalizedPath.contains("?") ? "&" : "?";
+    String encoded = URLEncoder.encode(code, StandardCharsets.UTF_8);
+    return base + normalizedPath + separator + "code=" + encoded;
   }
 
   private JavaMailSender resolveSender(Domain domain) {

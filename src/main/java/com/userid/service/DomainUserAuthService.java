@@ -9,6 +9,8 @@ import com.userid.api.user.UserLoginResponse;
 import com.userid.api.user.UserResetPasswordRequest;
 import com.userid.api.user.UserResponse;
 import com.userid.api.user.UserSelfUpdateRequest;
+import com.userid.dal.entity.OtpType;
+import com.userid.dal.entity.OtpUser;
 import com.userid.dal.entity.User;
 import com.userid.dal.repo.UserRepository;
 import com.userid.security.DomainUserJwtService;
@@ -49,10 +51,10 @@ public class DomainUserAuthService {
   }
 
   public ApiMessage confirm(Long domainId, UserConfirmRequest request) {
-    User user = userRepository.findByDomainIdAndEmail(domainId, request.email())
-        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
-    if (!userOtpService.verifyCode(user, request.code())) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or expired code");
+    OtpUser otp = userOtpService.requireValid(OtpType.VERIFICATION, request.code());
+    User user = otp.getUser();
+    if (!domainId.equals(user.getDomain().getId())) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Domain mismatch");
     }
     user.setEmailVerifiedAt(OffsetDateTime.now(ZoneOffset.UTC));
     userOtpService.clearVerificationCode(user);
@@ -73,10 +75,10 @@ public class DomainUserAuthService {
   }
 
   public ApiMessage resetPassword(Long domainId, UserResetPasswordRequest request) {
-    User user = userRepository.findByDomainIdAndEmail(domainId, request.email())
-        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
-    if (!userOtpService.verifyResetCode(user, request.code())) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or expired code");
+    OtpUser otp = userOtpService.requireValid(OtpType.RESET, request.code());
+    User user = otp.getUser();
+    if (!domainId.equals(user.getDomain().getId())) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Domain mismatch");
     }
     user.setPasswordHash(passwordEncoder.encode(request.password()));
     userOtpService.clearResetCode(user);

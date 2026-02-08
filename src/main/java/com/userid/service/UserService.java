@@ -132,9 +132,8 @@ public class UserService {
         .build();
 
     applyProfileValues(user, domainId, request.values());
-    String otpCode = userOtpService.createVerificationCode(user);
-
     User saved = userRepository.save(user);
+    String otpCode = userOtpService.createVerificationCode(saved);
     emailService.sendOtpEmail(domain, saved.getEmail(), otpCode);
     return toResponse(saved);
   }

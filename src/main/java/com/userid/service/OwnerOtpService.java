@@ -1,9 +1,9 @@
 package com.userid.service;
 
+import com.userid.dal.entity.OtpOwner;
 import com.userid.dal.entity.OtpType;
-import com.userid.dal.entity.OtpUser;
-import com.userid.dal.entity.User;
-import com.userid.dal.repo.OtpUserRepository;
+import com.userid.dal.entity.Owner;
+import com.userid.dal.repo.OtpOwnerRepository;
 import java.security.SecureRandom;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -13,49 +13,49 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
-public class UserOtpService {
-  private final OtpUserRepository otpUserRepository;
+public class OwnerOtpService {
+  private final OtpOwnerRepository otpOwnerRepository;
   private final SecureRandom random = new SecureRandom();
   private final long verificationHours;
   private final long resetHours;
 
-  public UserOtpService(
-      OtpUserRepository otpUserRepository,
-      @Value("${auth.user.otp-hours:24}") long verificationHours,
-      @Value("${auth.user.reset-hours:2}") long resetHours
+  public OwnerOtpService(
+      OtpOwnerRepository otpOwnerRepository,
+      @Value("${auth.email.verification-hours:24}") long verificationHours,
+      @Value("${auth.email.reset-hours:2}") long resetHours
   ) {
-    this.otpUserRepository = otpUserRepository;
+    this.otpOwnerRepository = otpOwnerRepository;
     this.verificationHours = verificationHours;
     this.resetHours = resetHours;
   }
 
-  public String createVerificationCode(User user) {
-    return createCode(user, OtpType.VERIFICATION, verificationHours);
+  public String createVerificationCode(Owner owner) {
+    return createCode(owner, OtpType.VERIFICATION, verificationHours);
   }
 
-  public String createResetCode(User user) {
-    return createCode(user, OtpType.RESET, resetHours);
+  public String createResetCode(Owner owner) {
+    return createCode(owner, OtpType.RESET, resetHours);
   }
 
-  public OtpUser requireValid(OtpType type, String code) {
+  public OtpOwner requireValid(OtpType type, String code) {
     if (code == null || code.isBlank()) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or expired code");
     }
-    OtpUser otp = otpUserRepository.findByCodeAndType(code, type)
+    OtpOwner otp = otpOwnerRepository.findByCodeAndType(code, type)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or expired code"));
     if (OffsetDateTime.now(ZoneOffset.UTC).isAfter(otp.getExpiresAt())) {
-      otpUserRepository.deleteByUserIdAndType(otp.getUser().getId(), type);
+      otpOwnerRepository.deleteByOwnerIdAndType(otp.getOwner().getId(), type);
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or expired code");
     }
     return otp;
   }
 
-  public void clearVerificationCode(User user) {
-    otpUserRepository.deleteByUserIdAndType(user.getId(), OtpType.VERIFICATION);
+  public void clearVerificationCode(Owner owner) {
+    otpOwnerRepository.deleteByOwnerIdAndType(owner.getId(), OtpType.VERIFICATION);
   }
 
-  public void clearResetCode(User user) {
-    otpUserRepository.deleteByUserIdAndType(user.getId(), OtpType.RESET);
+  public void clearResetCode(Owner owner) {
+    otpOwnerRepository.deleteByOwnerIdAndType(owner.getId(), OtpType.RESET);
   }
 
   private OffsetDateTime expireInHours(long hours) {
@@ -67,15 +67,15 @@ public class UserOtpService {
     return String.valueOf(value);
   }
 
-  private String createCode(User user, OtpType type, long hours) {
-    if (user.getId() == null) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User must be saved before OTP");
+  private String createCode(Owner owner, OtpType type, long hours) {
+    if (owner.getId() == null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Owner must be saved before OTP");
     }
-    otpUserRepository.deleteByUserIdAndType(user.getId(), type);
+    otpOwnerRepository.deleteByOwnerIdAndType(owner.getId(), type);
     String code = null;
     for (int i = 0; i < 10; i += 1) {
       String candidate = generateCode();
-      if (!otpUserRepository.existsByCodeAndType(candidate, type)) {
+      if (!otpOwnerRepository.existsByCodeAndType(candidate, type)) {
         code = candidate;
         break;
       }
@@ -83,14 +83,14 @@ public class UserOtpService {
     if (code == null) {
       throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to generate OTP");
     }
-    OtpUser otp = OtpUser.builder()
-        .user(user)
+    OtpOwner otp = OtpOwner.builder()
+        .owner(owner)
         .type(type)
         .code(code)
         .expiresAt(expireInHours(hours))
         .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
         .build();
-    otpUserRepository.save(otp);
+    otpOwnerRepository.save(otp);
     return code;
   }
 }
