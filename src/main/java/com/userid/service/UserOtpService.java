@@ -4,9 +4,9 @@ import com.userid.dal.entity.OtpType;
 import com.userid.dal.entity.OtpUser;
 import com.userid.dal.entity.User;
 import com.userid.dal.repo.OtpUserRepository;
-import java.security.SecureRandom;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -15,7 +15,6 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class UserOtpService {
   private final OtpUserRepository otpUserRepository;
-  private final SecureRandom random = new SecureRandom();
   private final long verificationHours;
   private final long resetHours;
 
@@ -63,8 +62,7 @@ public class UserOtpService {
   }
 
   private String generateCode() {
-    int value = random.nextInt(900000) + 100000;
-    return String.valueOf(value);
+    return UUID.randomUUID().toString().replace("-", "");
   }
 
   private String createCode(User user, OtpType type, long hours) {

@@ -45,7 +45,7 @@ public class OtpUser {
   @Column(nullable = false, length = 16)
   private OtpType type;
 
-  @Column(nullable = false, length = 16)
+  @Column(nullable = false, length = 64)
   private String code;
 
   @Column(name = "expires_at", nullable = false)
