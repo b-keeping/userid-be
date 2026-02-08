@@ -134,8 +134,6 @@ public class EmailService {
     } catch (Exception ex) {
       Long domainId = domain != null ? domain.getId() : null;
       String domainName = domain != null ? domain.getName() : null;
-      String smtpUser = domain != null ? domain.getSmtpUsername() : null;
-      String smtpUserUsed = smtpUser == null || smtpUser.isBlank() ? smtpUsername : smtpUser;
       log.error(
           "Email send failed domainId={} domainName={} to={} smtpHost={} smtpUser={} smtpUserUsed={} error={}",
           domainId, domainName, to, smtpHost, smtpUser, smtpUserUsed, ex.getMessage(), ex
