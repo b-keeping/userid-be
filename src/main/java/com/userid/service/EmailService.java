@@ -25,6 +25,7 @@ public class EmailService {
   private final String smtpPassword;
   private final boolean smtpAuth;
   private final boolean smtpStartTls;
+  private final String domainFromLocalPart;
 
   public EmailService(
       JavaMailSender mailSender,
@@ -36,6 +37,7 @@ public class EmailService {
       @Value("${spring.mail.password:}") String smtpPassword,
       @Value("${spring.mail.properties.mail.smtp.auth:true}") boolean smtpAuth,
       @Value("${spring.mail.properties.mail.smtp.starttls.enable:true}") boolean smtpStartTls,
+      @Value("${auth.email.domain-from-localpart:no-reply}") String domainFromLocalPart,
       @Value("${auth.email.from:no-reply@userid.local}") String fromAddress
   ) {
     this.mailSender = mailSender;
@@ -48,6 +50,7 @@ public class EmailService {
     this.smtpPassword = smtpPassword;
     this.smtpAuth = smtpAuth;
     this.smtpStartTls = smtpStartTls;
+    this.domainFromLocalPart = domainFromLocalPart;
   }
 
   public void sendVerificationEmail(String to, String link) {
@@ -97,12 +100,37 @@ public class EmailService {
   private void sendWithDomain(Domain domain, String to, String subject, String text) {
     SimpleMailMessage message = new SimpleMailMessage();
     message.setTo(to);
-    message.setFrom(fromAddress);
+    String from = buildFromAddress(domain);
+    message.setFrom(from);
     message.setSubject(subject);
     message.setText(text);
     JavaMailSender sender = resolveSender(domain);
+    String smtpUser = domain != null ? domain.getSmtpUsername() : null;
+    String smtpPass = domain != null ? domain.getSmtpPassword() : null;
+    String smtpUserUsed = smtpUser == null || smtpUser.isBlank() ? smtpUsername : smtpUser;
+    log.info(
+        "Email send attempt domainId={} domainName={} to={} from={} smtpHost={} smtpPort={} smtpUser={} smtpUserUsed={} smtpPassPresent={} smtpAuth={} startTls={}",
+        domain != null ? domain.getId() : null,
+        domain != null ? domain.getName() : null,
+        to,
+        from,
+        smtpHost,
+        smtpPort,
+        smtpUser,
+        smtpUserUsed,
+        smtpPass != null && !smtpPass.isBlank(),
+        smtpAuth,
+        smtpStartTls
+    );
     try {
       sender.send(message);
+      log.info(
+          "Email send success domainId={} domainName={} to={} from={}",
+          domain != null ? domain.getId() : null,
+          domain != null ? domain.getName() : null,
+          to,
+          from
+      );
     } catch (Exception ex) {
       Long domainId = domain != null ? domain.getId() : null;
       String domainName = domain != null ? domain.getName() : null;
@@ -114,6 +142,13 @@ public class EmailService {
       );
       throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Email send failed");
     }
+  }
+
+  private String buildFromAddress(Domain domain) {
+    if (domain == null || domain.getName() == null || domain.getName().isBlank()) {
+      return fromAddress;
+    }
+    return domainFromLocalPart + "@" + domain.getName();
   }
 
   private JavaMailSender resolveSender(Domain domain) {
