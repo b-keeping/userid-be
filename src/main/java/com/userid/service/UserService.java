@@ -17,6 +17,7 @@ import com.userid.dal.entity.User;
 import com.userid.dal.entity.UserProfileValue;
 import com.userid.dal.repo.DomainRepository;
 import com.userid.dal.repo.ProfileFieldRepository;
+import com.userid.dal.repo.UserProfileValueRepository;
 import com.userid.dal.repo.UserRepository;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -39,6 +40,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class UserService {
   private final DomainRepository domainRepository;
   private final ProfileFieldRepository profileFieldRepository;
+  private final UserProfileValueRepository userProfileValueRepository;
   private final UserRepository userRepository;
   private final AccessService accessService;
   private final ObjectMapper objectMapper;
@@ -197,8 +199,22 @@ public class UserService {
     Map<Long, ProfileField> fieldById = toFieldMap(fields);
     List<UserProfileValueRequest> valueRequests = requests == null ? List.of() : requests;
 
+    Set<UserProfileValue> userValues = user.getValues();
+    List<UserProfileValue> existingValues = user.getId() == null
+        ? List.of()
+        : userProfileValueRepository.findByUserId(user.getId());
+    for (UserProfileValue existing : existingValues) {
+      userValues.add(existing);
+    }
+
+    Map<Long, UserProfileValue> valueByFieldId = new HashMap<>();
+    for (UserProfileValue existing : userValues) {
+      if (existing.getField() != null && existing.getField().getId() != null) {
+        valueByFieldId.put(existing.getField().getId(), existing);
+      }
+    }
+
     Set<Long> providedFieldIds = new HashSet<>();
-    List<UserProfileValue> values = new ArrayList<>();
     List<Long> unknownFieldIds = new ArrayList<>();
 
     for (UserProfileValueRequest valueRequest : valueRequests) {
@@ -215,10 +231,15 @@ public class UserService {
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Duplicate profile field id: " + fieldId);
       }
 
-      UserProfileValue value = new UserProfileValue();
-      value.setField(field);
+      UserProfileValue value = valueByFieldId.get(fieldId);
+      if (value == null) {
+        value = new UserProfileValue();
+        value.setUser(user);
+        value.setField(field);
+        userValues.add(value);
+        valueByFieldId.put(fieldId, value);
+      }
       applyValue(value, field.getType(), valueRequest);
-      values.add(value);
     }
 
     if (!unknownFieldIds.isEmpty()) {
@@ -228,8 +249,12 @@ public class UserService {
       );
     }
 
+    boolean requireAllMandatory = user.getId() == null;
     List<String> missingMandatory = fields.stream()
-        .filter(field -> field.isMandatory() && !providedFieldIds.contains(field.getId()))
+        .filter(ProfileField::isMandatory)
+        .filter(field -> requireAllMandatory
+            ? !providedFieldIds.contains(field.getId())
+            : !providedFieldIds.contains(field.getId()) && !valueByFieldId.containsKey(field.getId()))
         .map(ProfileField::getName)
         .toList();
 
@@ -240,13 +265,7 @@ public class UserService {
       );
     }
 
-    user.getValues().clear();
-    for (UserProfileValue value : values) {
-      value.setUser(user);
-      user.getValues().add(value);
-    }
-
-    user.setProfileJsonb(serializeProfile(values));
+    user.setProfileJsonb(serializeProfile(new ArrayList<>(valueByFieldId.values())));
   }
 
   private void applyValue(UserProfileValue value, FieldType type, UserProfileValueRequest request) {
