@@ -33,15 +33,15 @@ public class DomainService {
   private final OwnerDomainRepository ownerDomainRepository;
   private final OwnerRepository ownerRepository;
   private final AccessService accessService;
-  private final DnsAdminClient dnsAdminClient;
+  private final PostalAdminClient postalAdminClient;
   private final DomainJwtSecretService domainJwtSecretService;
   private final DomainApiTokenService domainApiTokenService;
-  @org.springframework.beans.factory.annotation.Value("${auth.dns-admin.organization:Org1}")
-  private String dnsOrganization;
-  @org.springframework.beans.factory.annotation.Value("${auth.dns-admin.server:srv1}")
-  private String dnsServer;
-  @org.springframework.beans.factory.annotation.Value("${auth.dns-admin.template-server:Server1}")
-  private String dnsTemplateServer;
+  @org.springframework.beans.factory.annotation.Value("${auth.postal-admin.organization:Org1}")
+  private String postalOrganization;
+  @org.springframework.beans.factory.annotation.Value("${auth.postal-admin.template-server:Server1}")
+  private String postalTemplateServer;
+  @org.springframework.beans.factory.annotation.Value("${auth.postal-admin.smtp-name:}")
+  private String postalSmtpName;
 
   public DomainResponse create(Long ownerId, DomainRequest request) {
     Owner requester = accessService.requireUser(ownerId);
@@ -121,10 +121,10 @@ public class DomainService {
     Domain domain = domainRepository.findById(domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found"));
 
-    String serverName = buildServerName(domain.getName(), domain.getId(), dnsServer);
+    String serverName = buildServerName(domain.getName());
     try {
-      DnsAdminClient.VerifyCheckResponse verifyResponse =
-          dnsAdminClient.verifyCheck(dnsOrganization, serverName, domain.getName());
+      PostalAdminClient.VerifyCheckResponse verifyResponse =
+          postalAdminClient.verifyCheck(postalOrganization, serverName, domain.getName());
       if (verifyResponse.record() != null) {
         applyRecord(
             verifyResponse.record(),
@@ -137,8 +137,8 @@ public class DomainService {
         );
       }
 
-      DnsAdminClient.DnsCheckResponse dnsResponse =
-          dnsAdminClient.dnsCheck(dnsOrganization, serverName, domain.getName());
+      PostalAdminClient.DnsCheckResponse dnsResponse =
+          postalAdminClient.dnsCheck(postalOrganization, serverName, domain.getName());
       JsonNode records = dnsResponse.records();
       applyRecord(findRecord(records, "spf"), domain::setSpf, domain::setSpfHost, domain::setSpfType, null, null, domain::setSpfStt);
       applyRecord(findRecord(records, "dkim"), domain::setDkim, domain::setDkimHost, domain::setDkimType, null, null, domain::setDkimStt);
@@ -160,15 +160,23 @@ public class DomainService {
     return toResponse(domainRepository.save(domain));
   }
 
+  public DomainResponse resetSmtp(Long ownerId, Long domainId) {
+    accessService.requireDomainAccess(ownerId, domainId);
+    Domain domain = domainRepository.findById(domainId)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found"));
+    populateDns(domain);
+    return toResponse(domainRepository.save(domain));
+  }
+
   public DomainResponse verifyDomain(Long ownerId, Long domainId) {
     accessService.requireDomainAccess(ownerId, domainId);
     Domain domain = domainRepository.findById(domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found"));
 
-    String serverName = buildServerName(domain.getName(), domain.getId(), dnsServer);
+    String serverName = buildServerName(domain.getName());
     try {
-      DnsAdminClient.VerifyCheckResponse verifyResponse =
-          dnsAdminClient.verifyCheck(dnsOrganization, serverName, domain.getName());
+      PostalAdminClient.VerifyCheckResponse verifyResponse =
+          postalAdminClient.verifyCheck(postalOrganization, serverName, domain.getName());
       if (verifyResponse.record() != null) {
         applyRecord(
             verifyResponse.record(),
@@ -270,12 +278,13 @@ public class DomainService {
   private void populateDns(Domain domain) {
     try {
       log.info("DNS provision start domainId={} name={}", domain.getId(), domain.getName());
-      String serverName = buildServerName(domain.getName(), domain.getId(), dnsServer);
-      DnsAdminClient.ProvisionResponse response = dnsAdminClient.provisionDomain(
-          dnsOrganization,
-          dnsTemplateServer,
+      String serverName = buildServerName(domain.getName());
+      PostalAdminClient.ProvisionResponse response = postalAdminClient.provisionDomain(
+          postalOrganization,
+          postalTemplateServer,
           serverName,
-          domain.getName()
+          domain.getName(),
+          postalSmtpName
       );
       log.info("DNS provision response domainId={} ok={} error={}", domain.getId(), response.ok(), response.error());
       domain.setDnsStatus(null);
@@ -293,7 +302,7 @@ public class DomainService {
       if (response.ok() && response.smtp() != null) {
         String smtpKey = response.smtp().path("key").asText(null);
         if (smtpKey != null && !smtpKey.isBlank()) {
-          domain.setSmtpUsername(null);
+          domain.setSmtpUsername(postalSmtpName);
           domain.setSmtpPassword(smtpKey);
           log.info("SMTP credentials saved domainId={}", domain.getId());
         }
@@ -310,7 +319,7 @@ public class DomainService {
     }
   }
 
-  private String buildServerName(String domainName, Long domainId, String fallback) {
+  private String buildServerName(String domainName) {
     if (domainName != null && !domainName.isBlank()) {
       return domainName;
     }

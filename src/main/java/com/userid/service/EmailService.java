@@ -42,7 +42,7 @@ public class EmailService {
       @Value("${spring.mail.password:}") String smtpPassword,
       @Value("${spring.mail.properties.mail.smtp.auth:true}") boolean smtpAuth,
       @Value("${spring.mail.properties.mail.smtp.starttls.enable:true}") boolean smtpStartTls,
-      @Value("${auth.email.domain-from-localpart:no-reply}") String domainFromLocalPart,
+      @Value("${EMAIL_DOMAIN_FROM_LOCALPART:no-reply}") String domainFromLocalPart,
       @Value("${auth.user.link-scheme:https}") String userLinkScheme,
       @Value("${auth.user.verify-path:/verify}") String userVerifyPath,
       @Value("${auth.user.reset-path:/reset}") String userResetPath,

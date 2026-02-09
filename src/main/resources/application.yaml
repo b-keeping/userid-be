@@ -1,19 +1,19 @@
 spring:
   datasource:
-    url: ${AUTH_DB_URL:jdbc:postgresql://localhost:5432/userid}
-    username: ${AUTH_DB_USER:userid}
-    password: ${AUTH_DB_PASSWORD:userid}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/userid}
+    username: ${DB_USER:userid}
+    password: ${DB_PASSWORD:userid}
   mail:
-    host: ${AUTH_SMTP_HOST:}
-    port: ${AUTH_SMTP_PORT:587}
-    username: ${AUTH_SMTP_USER:}
-    password: ${AUTH_SMTP_PASSWORD:}
+    host: ${SMTP_HOST:}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USER:}
+    password: ${SMTP_PASSWORD:}
     properties:
       mail:
         smtp:
-          auth: ${AUTH_SMTP_AUTH:true}
+          auth: ${SMTP_AUTH:true}
           starttls:
-            enable: ${AUTH_SMTP_STARTTLS:true}
+            enable: ${SMTP_STARTTLS:true}
   jpa:
     hibernate:
       ddl-auto: update
@@ -23,28 +23,28 @@ spring:
   jackson: {}
 
 server:
-  port: ${AUTH_PORT:8282}
+  port: ${PORT:8282}
 
 auth:
   jwt:
-    secret: ${AUTH_JWT_SECRET:change-me-please-change-me-please-change-me-32bytes}
-    expiration-minutes: ${AUTH_JWT_EXP_MINUTES:60}
+    secret: ${JWT_SECRET:change-me-please-change-me-please-change-me-32bytes}
+    expiration-minutes: ${JWT_EXP_MINUTES:60}
   user-jwt:
-    expiration-minutes: ${AUTH_USER_JWT_EXP_MINUTES:60}
+    expiration-minutes: ${USER_JWT_EXP_MINUTES:60}
   user:
-    otp-hours: ${AUTH_USER_OTP_HOURS:24}
-    reset-hours: ${AUTH_USER_RESET_HOURS:2}
+    otp-hours: ${USER_OTP_HOURS:24}
+    reset-hours: ${USER_RESET_HOURS:2}
   email:
-    from: ${AUTH_EMAIL_FROM:no-reply@userid.local}
-    verify-base-url: ${AUTH_VERIFY_BASE_URL:https://userid.koshsystems.com/verify}
-    reset-base-url: ${AUTH_RESET_BASE_URL:https://userid.koshsystems.com/reset}
-    verification-hours: ${AUTH_VERIFY_HOURS:24}
-    reset-hours: ${AUTH_RESET_HOURS:2}
-  dns-admin:
-    base-url: ${AUTH_DNS_ADMIN_URL:http://postal-admin:8181}
-    token: ${AUTH_DNS_ADMIN_TOKEN:change-me-long-random-token}
-    token-header: ${AUTH_DNS_ADMIN_TOKEN_HEADER:X-Admin-Token}
-    timeout-seconds: ${AUTH_DNS_ADMIN_TIMEOUT_SECONDS:15}
-    organization: ${AUTH_DNS_ADMIN_ORG:Org1}
-    server: ${AUTH_DNS_ADMIN_SERVER:srv1}
-    template-server: ${AUTH_DNS_ADMIN_TEMPLATE_SERVER:Server1}
+    from: ${EMAIL_FROM:no-reply@userid.local}
+    verify-base-url: ${VERIFY_BASE_URL:https://userid.koshsystems.com/verify}
+    reset-base-url: ${RESET_BASE_URL:https://userid.koshsystems.com/reset}
+    verification-hours: ${VERIFY_HOURS:24}
+    reset-hours: ${RESET_HOURS:2}
+  postal-admin:
+    base-url: ${POSTAL_ADMIN_URL:http://postal-admin:8181}
+    token: ${POSTAL_ADMIN_TOKEN:change-me-long-random-token}
+    token-header: ${POSTAL_ADMIN_TOKEN_HEADER:X-Admin-Token}
+    timeout-seconds: ${POSTAL_ADMIN_TIMEOUT_SECONDS:2}
+    organization: ${POSTAL_ORG:Org1}
+    template-server: ${POSTAL_TEMPLATE_SERVER:Server1}
+    smtp-name: ${DOMAIN_SMTP_LOGIN:}

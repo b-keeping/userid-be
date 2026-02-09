@@ -108,4 +108,4 @@ erDiagram
 - `users.profile_jsonb` stores a denormalized snapshot of profile values and is used for user fetch responses.
 - Each domain has a single owner (USER). Different owners can reuse domain names.
 - Requests must include `Authorization: Bearer <JWT>` for access checks (admin vs domain-linked user).
-- Default auth service port: `8282` (override with `AUTH_PORT`).
+- Default auth service port: `8282` (override with `PORT`).

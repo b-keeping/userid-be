@@ -18,8 +18,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Service
-public class DnsAdminClient {
-  private static final Logger log = LoggerFactory.getLogger(DnsAdminClient.class);
+public class PostalAdminClient {
+  private static final Logger log = LoggerFactory.getLogger(PostalAdminClient.class);
   private final ObjectMapper objectMapper;
   private final HttpClient httpClient;
   private final String baseUrl;
@@ -27,12 +27,12 @@ public class DnsAdminClient {
   private final String tokenHeader;
   private final Duration timeout;
 
-  public DnsAdminClient(
+  public PostalAdminClient(
       ObjectMapper objectMapper,
-      @Value("${auth.dns-admin.base-url}") String baseUrl,
-      @Value("${auth.dns-admin.token}") String token,
-      @Value("${auth.dns-admin.token-header:X-Admin-Token}") String tokenHeader,
-      @Value("${auth.dns-admin.timeout-seconds:15}") long timeoutSeconds
+      @Value("${auth.postal-admin.base-url}") String baseUrl,
+      @Value("${auth.postal-admin.token}") String token,
+      @Value("${auth.postal-admin.token-header:X-Admin-Token}") String tokenHeader,
+      @Value("${auth.postal-admin.timeout-seconds:15}") long timeoutSeconds
   ) {
     this.objectMapper = objectMapper;
     this.baseUrl = baseUrl;
@@ -48,13 +48,15 @@ public class DnsAdminClient {
       String organization,
       String templateServer,
       String server,
-      String domain
+      String domain,
+      String smtpName
   ) {
     Map<String, Object> payload = new HashMap<>();
     payload.put("organization", organization);
     payload.put("template_server", templateServer);
     payload.put("server", server);
     payload.put("domain", domain);
+    payload.put("smtp_name", smtpName);
 
     JsonNode root = postJson("/provision", payload);
     boolean ok = root.path("ok").asBoolean(false);
@@ -102,7 +104,7 @@ public class DnsAdminClient {
   private JsonNode postJson(String path, Object payload) {
     try {
       String body = objectMapper.writeValueAsString(payload);
-      log.info("DNS admin request {} payload={}", path, body);
+      log.info("Postal admin request {} payload={}", path, body);
       HttpRequest request = HttpRequest.newBuilder()
           .uri(URI.create(baseUrl + path))
           .timeout(timeout)
@@ -112,7 +114,7 @@ public class DnsAdminClient {
           .build();
 
       HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-      log.info("DNS admin response {} status={} body={}", path, response.statusCode(), response.body());
+      log.info("Postal admin response {} status={} body={}", path, response.statusCode(), response.body());
       if (response.statusCode() >= 400) {
         throw new ResponseStatusException(
             HttpStatus.BAD_GATEWAY,

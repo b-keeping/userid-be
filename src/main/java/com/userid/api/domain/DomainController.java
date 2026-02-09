@@ -65,6 +65,14 @@ public class DomainController {
     return domainService.verifyDomain(principal.id(), domainId);
   }
 
+  @PostMapping("/{domainId}/smtp-reset")
+  public DomainResponse resetSmtp(
+      @AuthenticationPrincipal AuthPrincipal principal,
+      @PathVariable Long domainId
+  ) {
+    return domainService.resetSmtp(principal.id(), domainId);
+  }
+
   @GetMapping("/{domainId}/user-jwt-secret")
   public DomainJwtSecretResponse getUserJwtSecret(
       @AuthenticationPrincipal AuthPrincipal principal,
