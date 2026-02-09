@@ -16,6 +16,7 @@ import com.userid.dal.repo.OwnerRepository;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -82,7 +83,7 @@ public class DomainService {
       linkDomain(requester, saved);
     }
     log.info("Domain ownership linked domainId={} ownerId={}", saved.getId(), requester.getRole() == OwnerRole.ADMIN ? owner.getId() : requester.getId());
-    populateDns(saved);
+    populateDns(saved, false);
     log.info("Domain DNS populated domainId={}", saved.getId());
     return toResponse(domainRepository.save(saved));
   }
@@ -164,7 +165,7 @@ public class DomainService {
     accessService.requireDomainAccess(ownerId, domainId);
     Domain domain = domainRepository.findById(domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found"));
-    populateDns(domain);
+    populateDns(domain, true);
     return toResponse(domainRepository.save(domain));
   }
 
@@ -275,7 +276,7 @@ public class DomainService {
     );
   }
 
-  private void populateDns(Domain domain) {
+  private void populateDns(Domain domain, boolean preserveStatusesOnSame) {
     try {
       log.info("DNS provision start domainId={} name={}", domain.getId(), domain.getName());
       String serverName = buildServerName(domain.getName());
@@ -287,16 +288,106 @@ public class DomainService {
           postalSmtpName
       );
       log.info("DNS provision response domainId={} ok={} error={}", domain.getId(), response.ok(), response.error());
-      domain.setDnsStatus(null);
-      domain.setDnsError(null);
+      if (!preserveStatusesOnSame) {
+        domain.setDnsStatus(null);
+        domain.setDnsError(null);
+      }
 
       if (response.ok() && response.records() != null) {
         JsonNode records = response.records();
-        applyRecord(findRecord(records, "verification"), domain::setVerify, domain::setVerifyHost, domain::setVerifyType, null, null, null);
-        applyRecord(findRecord(records, "spf"), domain::setSpf, domain::setSpfHost, domain::setSpfType, null, null, null);
-        applyRecord(findRecord(records, "dkim"), domain::setDkim, domain::setDkimHost, domain::setDkimType, null, null, null);
-        applyRecord(findRecord(records, "return_path"), domain::setReturnPath, domain::setReturnPathHost, domain::setReturnPathType, null, null, null);
-        applyRecord(findRecord(records, "mx"), domain::setMx, domain::setMxHost, domain::setMxType, domain::setMxPriority, domain::setMxOptional, null);
+        if (preserveStatusesOnSame) {
+          boolean changedVerify = applyRecordIfChanged(
+              findRecord(records, "verification"),
+              domain.getVerify(),
+              domain.getVerifyHost(),
+              domain.getVerifyType(),
+              null,
+              null,
+              domain::setVerify,
+              domain::setVerifyHost,
+              domain::setVerifyType,
+              null,
+              null
+          );
+          if (changedVerify) {
+            domain.setVerifyStt(false);
+          }
+          boolean changedSpf = applyRecordIfChanged(
+              findRecord(records, "spf"),
+              domain.getSpf(),
+              domain.getSpfHost(),
+              domain.getSpfType(),
+              null,
+              null,
+              domain::setSpf,
+              domain::setSpfHost,
+              domain::setSpfType,
+              null,
+              null
+          );
+          if (changedSpf) {
+            domain.setSpfStt(false);
+          }
+          boolean changedDkim = applyRecordIfChanged(
+              findRecord(records, "dkim"),
+              domain.getDkim(),
+              domain.getDkimHost(),
+              domain.getDkimType(),
+              null,
+              null,
+              domain::setDkim,
+              domain::setDkimHost,
+              domain::setDkimType,
+              null,
+              null
+          );
+          if (changedDkim) {
+            domain.setDkimStt(false);
+          }
+          boolean changedReturnPath = applyRecordIfChanged(
+              findRecord(records, "return_path"),
+              domain.getReturnPath(),
+              domain.getReturnPathHost(),
+              domain.getReturnPathType(),
+              null,
+              null,
+              domain::setReturnPath,
+              domain::setReturnPathHost,
+              domain::setReturnPathType,
+              null,
+              null
+          );
+          if (changedReturnPath) {
+            domain.setReturnPathStt(false);
+          }
+          boolean changedMx = applyRecordIfChanged(
+              findRecord(records, "mx"),
+              domain.getMx(),
+              domain.getMxHost(),
+              domain.getMxType(),
+              domain.getMxPriority(),
+              domain.getMxOptional(),
+              domain::setMx,
+              domain::setMxHost,
+              domain::setMxType,
+              domain::setMxPriority,
+              domain::setMxOptional
+          );
+          if (changedMx) {
+            domain.setMxStt(false);
+          }
+        } else {
+          applyRecord(findRecord(records, "verification"), domain::setVerify, domain::setVerifyHost, domain::setVerifyType, null, null, null);
+          applyRecord(findRecord(records, "spf"), domain::setSpf, domain::setSpfHost, domain::setSpfType, null, null, null);
+          applyRecord(findRecord(records, "dkim"), domain::setDkim, domain::setDkimHost, domain::setDkimType, null, null, null);
+          applyRecord(findRecord(records, "return_path"), domain::setReturnPath, domain::setReturnPathHost, domain::setReturnPathType, null, null, null);
+          applyRecord(findRecord(records, "mx"), domain::setMx, domain::setMxHost, domain::setMxType, domain::setMxPriority, domain::setMxOptional, null);
+          domain.setVerifyStt(false);
+          domain.setSpfStt(false);
+          domain.setDkimStt(false);
+          domain.setReturnPathStt(false);
+          domain.setMxStt(false);
+        }
         log.info("DNS records saved domainId={}", domain.getId());
       }
       if (response.ok() && response.smtp() != null) {
@@ -307,16 +398,64 @@ public class DomainService {
           log.info("SMTP credentials saved domainId={}", domain.getId());
         }
       }
-      domain.setVerifyStt(false);
-      domain.setSpfStt(false);
-      domain.setDkimStt(false);
-      domain.setReturnPathStt(false);
-      domain.setMxStt(false);
     } catch (ResponseStatusException ex) {
       domain.setDnsStatus("error");
       domain.setDnsError(ex.getReason());
       log.warn("DNS provision failed domainId={} reason={}", domain.getId(), ex.getReason());
     }
+  }
+
+  private boolean applyRecordIfChanged(
+      com.fasterxml.jackson.databind.JsonNode record,
+      String currentValue,
+      String currentHost,
+      String currentType,
+      Integer currentPriority,
+      Boolean currentOptional,
+      java.util.function.Consumer<String> valueSetter,
+      java.util.function.Consumer<String> hostSetter,
+      java.util.function.Consumer<String> typeSetter,
+      java.util.function.Consumer<Integer> prioritySetter,
+      java.util.function.Consumer<Boolean> optionalSetter
+  ) {
+    if (record == null || record.isMissingNode()) {
+      return false;
+    }
+    String nextValue = record.path("value").asText(null);
+    String nextHost = record.path("host").asText(null);
+    String nextType = record.path("type").asText(null);
+    Integer nextPriority = null;
+    Boolean nextOptional = null;
+    if (record.has("priority") && !record.get("priority").isNull()) {
+      nextPriority = record.path("priority").asInt();
+    }
+    if (record.has("optional") && !record.get("optional").isNull()) {
+      nextOptional = record.path("optional").asBoolean();
+    }
+    boolean changed = !Objects.equals(currentValue, nextValue)
+        || !Objects.equals(currentHost, nextHost)
+        || !Objects.equals(currentType, nextType)
+        || !Objects.equals(currentPriority, nextPriority)
+        || !Objects.equals(currentOptional, nextOptional);
+    if (!changed) {
+      return false;
+    }
+    if (valueSetter != null) {
+      valueSetter.accept(nextValue);
+    }
+    if (hostSetter != null) {
+      hostSetter.accept(nextHost);
+    }
+    if (typeSetter != null) {
+      typeSetter.accept(nextType);
+    }
+    if (prioritySetter != null) {
+      prioritySetter.accept(nextPriority);
+    }
+    if (optionalSetter != null) {
+      optionalSetter.accept(nextOptional);
+    }
+    return true;
   }
 
   private String buildServerName(String domainName) {
