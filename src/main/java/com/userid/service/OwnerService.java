@@ -22,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
@@ -32,6 +33,7 @@ public class OwnerService {
   private final DomainRepository domainRepository;
   private final AccessService accessService;
   private final PasswordEncoder passwordEncoder;
+  private final OwnerOtpService ownerOtpService;
 
   public OwnerResponse create(Long ownerId, OwnerRequest request) {
     accessService.requireAdmin(ownerId);
@@ -174,11 +176,13 @@ public class OwnerService {
     ownerDomainRepository.deleteByOwnerIdAndDomainId(user.getId(), domainId);
   }
 
+  @Transactional
   public void delete(Long ownerId, Long targetUserId) {
     accessService.requireAdmin(ownerId);
     Owner user = ownerRepository.findById(targetUserId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Owner not found"));
     ensureDomainsHaveOtherOwners(user.getId(), currentDomainIds(user.getId()));
+    ownerOtpService.clearAllCodes(user);
     ownerDomainRepository.deleteByOwnerId(user.getId());
     ownerRepository.delete(user);
   }

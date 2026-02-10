@@ -57,6 +57,10 @@ public class UserOtpService {
     otpUserRepository.deleteByUserIdAndType(user.getId(), OtpType.RESET);
   }
 
+  public void clearAllCodes(User user) {
+    otpUserRepository.deleteByUserId(user.getId());
+  }
+
   private OffsetDateTime expireInHours(long hours) {
     return OffsetDateTime.now(ZoneOffset.UTC).plusHours(hours);
   }

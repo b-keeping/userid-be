@@ -57,6 +57,10 @@ public class OwnerOtpService {
     otpOwnerRepository.deleteByOwnerIdAndType(owner.getId(), OtpType.RESET);
   }
 
+  public void clearAllCodes(Owner owner) {
+    otpOwnerRepository.deleteByOwnerId(owner.getId());
+  }
+
   private OffsetDateTime expireInHours(long hours) {
     return OffsetDateTime.now(ZoneOffset.UTC).plusHours(hours);
   }

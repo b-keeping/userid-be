@@ -112,10 +112,13 @@ public class UserService {
     return updateInternal(user, domainId, request, false);
   }
 
+  @org.springframework.transaction.annotation.Transactional
   public void delete(Long serviceUserId, Long domainId, Long userId) {
     accessService.requireDomainAccess(serviceUserId, domainId);
     User user = userRepository.findByIdAndDomainId(userId, domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+    userOtpService.clearAllCodes(user);
+    userProfileValueRepository.deleteByUserId(user.getId());
     userRepository.delete(user);
   }
 
