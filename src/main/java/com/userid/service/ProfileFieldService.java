@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
@@ -100,6 +101,7 @@ public class ProfileFieldService {
     return toResponse(saved);
   }
 
+  @Transactional
   public void delete(Long serviceUserId, Long domainId, Long fieldId) {
     accessService.requireDomainAccess(serviceUserId, domainId);
     ProfileField field = profileFieldRepository.findByIdAndDomainId(fieldId, domainId)
