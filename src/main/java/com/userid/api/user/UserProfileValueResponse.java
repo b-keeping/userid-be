@@ -12,6 +12,7 @@ public record UserProfileValueResponse(
     FieldType type,
     boolean mandatory,
     String stringValue,
+    String numericValue,
     Boolean booleanValue,
     Long integerValue,
     BigDecimal decimalValue,

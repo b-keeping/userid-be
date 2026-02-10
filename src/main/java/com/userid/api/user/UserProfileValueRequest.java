@@ -8,6 +8,7 @@ import java.time.OffsetDateTime;
 public record UserProfileValueRequest(
     Long fieldId,
     String stringValue,
+    String numericValue,
     Boolean booleanValue,
     Long integerValue,
     BigDecimal decimalValue,

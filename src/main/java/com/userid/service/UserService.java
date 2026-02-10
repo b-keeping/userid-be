@@ -274,6 +274,10 @@ public class UserService {
         requireValue(request.stringValue(), "stringValue");
         value.setValueString(request.stringValue());
       }
+      case NUMERIC -> {
+        String numeric = requireDigits(request.numericValue(), "numericValue");
+        value.setValueString(numeric);
+      }
       case BOOLEAN -> {
         requireValue(request.booleanValue(), "booleanValue");
         value.setValueBoolean(request.booleanValue());
@@ -305,6 +309,8 @@ public class UserService {
     return switch (field.getType()) {
       case STRING -> new UserSearchFilter(field.getId(), field.getType(),
           requireValue(request.stringValue(), "stringValue"), null, null, null, null, null, null);
+      case NUMERIC -> new UserSearchFilter(field.getId(), field.getType(),
+          requireDigits(request.numericValue(), "numericValue"), null, null, null, null, null, null);
       case BOOLEAN -> new UserSearchFilter(field.getId(), field.getType(),
           null, requireValue(request.booleanValue(), "booleanValue"), null, null, null, null, null);
       case INTEGER -> new UserSearchFilter(field.getId(), field.getType(),
@@ -337,12 +343,15 @@ public class UserService {
 
   private UserProfileValueResponse toResponse(UserProfileValue value) {
     ProfileField field = value.getField();
+    String stringValue = field.getType() == FieldType.NUMERIC ? null : value.getValueString();
+    String numericValue = field.getType() == FieldType.NUMERIC ? value.getValueString() : null;
     return new UserProfileValueResponse(
         field.getId(),
         field.getName(),
         field.getType(),
         field.isMandatory(),
-        value.getValueString(),
+        stringValue,
+        numericValue,
         value.getValueBoolean(),
         value.getValueInteger(),
         value.getValueDecimal(),
@@ -358,6 +367,16 @@ public class UserService {
     }
     if (value instanceof String stringValue && stringValue.isBlank()) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing value for " + name);
+    }
+    return value;
+  }
+
+  private static String requireDigits(String value, String name) {
+    if (value == null || value.isBlank()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing value for " + name);
+    }
+    if (!value.chars().allMatch(Character::isDigit)) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid numeric value for " + name);
     }
     return value;
   }

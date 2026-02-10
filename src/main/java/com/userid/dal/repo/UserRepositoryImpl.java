@@ -43,7 +43,7 @@ public class UserRepositoryImpl implements UserRepositoryCustom {
       subPredicates.add(cb.equal(fieldJoin.get("id"), filter.fieldId()));
 
       switch (filter.type()) {
-        case STRING -> subPredicates.add(cb.equal(valueRoot.get("valueString"), filter.stringValue()));
+        case STRING, NUMERIC -> subPredicates.add(cb.equal(valueRoot.get("valueString"), filter.stringValue()));
         case BOOLEAN -> subPredicates.add(cb.equal(valueRoot.get("valueBoolean"), filter.booleanValue()));
         case INTEGER -> subPredicates.add(cb.equal(valueRoot.get("valueInteger"), filter.integerValue()));
         case DECIMAL -> subPredicates.add(cb.equal(valueRoot.get("valueDecimal"), filter.decimalValue()));
