@@ -7,6 +7,7 @@ import java.time.OffsetDateTime;
 
 public record UserProfileValueRequest(
     Long fieldId,
+    String name,
     String stringValue,
     String numericValue,
     Boolean booleanValue,

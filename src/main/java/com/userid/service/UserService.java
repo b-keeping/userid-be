@@ -220,7 +220,8 @@ public class UserService {
     Set<Long> providedFieldIds = new HashSet<>();
     List<Long> unknownFieldIds = new ArrayList<>();
 
-    for (UserProfileValueRequest valueRequest : valueRequests) {
+    for (UserProfileValueRequest rawRequest : valueRequests) {
+      UserProfileValueRequest valueRequest = stripDisplayName(rawRequest);
       Long fieldId = valueRequest.fieldId();
       if (fieldId == null) {
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Profile field id is required");
@@ -306,6 +307,21 @@ public class UserService {
         value.setValueTimestamp(request.timestampValue());
       }
     }
+  }
+
+  private static UserProfileValueRequest stripDisplayName(UserProfileValueRequest request) {
+    // "name" is accepted in incoming JSON for UI/docs convenience and ignored by backend logic.
+    return new UserProfileValueRequest(
+        request.fieldId(),
+        null,
+        request.stringValue(),
+        request.numericValue(),
+        request.booleanValue(),
+        request.integerValue(),
+        request.decimalValue(),
+        request.dateValue(),
+        request.timeValue(),
+        request.timestampValue());
   }
 
   private UserSearchFilter toSearchFilter(ProfileField field, UserProfileFilterRequest request) {
