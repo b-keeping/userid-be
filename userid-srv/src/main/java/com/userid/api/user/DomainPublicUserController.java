@@ -1,6 +1,7 @@
 package com.userid.api.user;
 
 import com.userid.api.common.ApiMessage;
+import com.userid.api.client.UseridApiEndpoints;
 import com.userid.security.DomainApiPrincipal;
 import com.userid.service.DomainUserAuthService;
 import com.userid.service.UserService;
@@ -16,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
-@RequestMapping("/api/external/domains/{domainId}/users")
+@RequestMapping(UseridApiEndpoints.EXTERNAL_DOMAIN_USERS_BASE)
 @RequiredArgsConstructor
 public class DomainPublicUserController {
   private final UserService userService;
@@ -32,7 +33,7 @@ public class DomainPublicUserController {
     return userService.registerByDomain(domainId, request);
   }
 
-  @PostMapping("/login")
+  @PostMapping(UseridApiEndpoints.LOGIN)
   public UserLoginResponse login(
       @AuthenticationPrincipal DomainApiPrincipal principal,
       @PathVariable Long domainId,
@@ -42,7 +43,7 @@ public class DomainPublicUserController {
     return domainUserAuthService.login(domainId, request);
   }
 
-  @PostMapping("/confirm")
+  @PostMapping(UseridApiEndpoints.CONFIRM)
   public ApiMessage confirm(
       @AuthenticationPrincipal DomainApiPrincipal principal,
       @PathVariable Long domainId,
@@ -52,7 +53,7 @@ public class DomainPublicUserController {
     return domainUserAuthService.confirm(domainId, request);
   }
 
-  @PostMapping("/forgot-password")
+  @PostMapping(UseridApiEndpoints.FORGOT_PASSWORD)
   public ApiMessage forgotPassword(
       @AuthenticationPrincipal DomainApiPrincipal principal,
       @PathVariable Long domainId,
@@ -62,7 +63,7 @@ public class DomainPublicUserController {
     return domainUserAuthService.forgotPassword(domainId, request);
   }
 
-  @PostMapping("/reset-password")
+  @PostMapping(UseridApiEndpoints.RESET_PASSWORD)
   public ApiMessage resetPassword(
       @AuthenticationPrincipal DomainApiPrincipal principal,
       @PathVariable Long domainId,
@@ -72,7 +73,7 @@ public class DomainPublicUserController {
     return domainUserAuthService.resetPassword(domainId, request);
   }
 
-  @PostMapping("/resend-verification")
+  @PostMapping(UseridApiEndpoints.RESEND_VERIFICATION)
   public ApiMessage resendVerification(
       @AuthenticationPrincipal DomainApiPrincipal principal,
       @PathVariable Long domainId,

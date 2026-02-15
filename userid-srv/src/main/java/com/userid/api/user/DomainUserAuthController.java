@@ -1,5 +1,6 @@
 package com.userid.api.user;
 
+import com.userid.api.client.UseridApiEndpoints;
 import com.userid.service.DomainUserAuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -10,12 +11,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/external/domains/{domainId}/users")
+@RequestMapping(UseridApiEndpoints.EXTERNAL_DOMAIN_USERS_BASE)
 @RequiredArgsConstructor
 public class DomainUserAuthController {
   private final DomainUserAuthService domainUserAuthService;
 
-  @PutMapping("/me")
+  @PutMapping(UseridApiEndpoints.ME)
   public UserResponse updateSelf(
       @PathVariable Long domainId,
       HttpServletRequest request,

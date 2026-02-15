@@ -1,13 +1,17 @@
 FROM maven:3.9-eclipse-temurin-25 AS build
 
-WORKDIR /app
+WORKDIR /build
 
-COPY pom.xml .
-RUN mvn -q -DskipTests dependency:go-offline
+COPY userid-be/userid-api/pom.xml userid-be/userid-api/pom.xml
+COPY userid-be/userid-srv/pom.xml userid-be/userid-srv/pom.xml
 
-COPY src ./src
+RUN mvn -q -f userid-be/userid-api/pom.xml -DskipTests dependency:go-offline
+COPY userid-be/userid-api/src userid-be/userid-api/src
+RUN mvn -q -f userid-be/userid-api/pom.xml -DskipTests install
 
-RUN mvn -q -DskipTests package
+RUN mvn -q -f userid-be/userid-srv/pom.xml -DskipTests dependency:go-offline
+COPY userid-be/userid-srv/src userid-be/userid-srv/src
+RUN mvn -q -f userid-be/userid-srv/pom.xml -DskipTests package
 
 FROM eclipse-temurin:25-jre AS runtime
 
@@ -17,7 +21,7 @@ RUN apt-get update && \
     apt-get install -y curl && \
     rm -rf /var/lib/apt/lists/*
 
-COPY --from=build /app/target/*.jar /app/app.jar
+COPY --from=build /build/userid-be/userid-srv/target/*.jar /app/app.jar
 
 ENV JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75"
 

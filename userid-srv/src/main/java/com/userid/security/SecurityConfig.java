@@ -1,5 +1,6 @@
 package com.userid.security;
 
+import com.userid.api.client.UseridApiEndpoints;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -44,8 +45,13 @@ public class SecurityConfig {
         )
         .authorizeHttpRequests(auth -> auth
             .requestMatchers("/error").permitAll()
-            .requestMatchers(HttpMethod.PUT, "/api/external/domains/*/users/me").permitAll()
-            .requestMatchers("/api/external/domains/*/users/**").hasRole("DOMAIN_API")
+            .requestMatchers(
+                HttpMethod.PUT,
+                UseridApiEndpoints.EXTERNAL_DOMAIN_USERS_WILDCARD_BASE + UseridApiEndpoints.ME)
+            .permitAll()
+            .requestMatchers(
+                UseridApiEndpoints.EXTERNAL_DOMAIN_USERS_WILDCARD_BASE + UseridApiEndpoints.ALL_SUBPATHS)
+            .hasRole("DOMAIN_API")
             .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
             .requestMatchers(HttpMethod.POST, "/api/auth/register").permitAll()
             .requestMatchers(HttpMethod.GET, "/api/auth/confirm").permitAll()
