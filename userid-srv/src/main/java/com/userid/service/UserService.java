@@ -31,6 +31,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -145,34 +146,41 @@ public class UserService {
   @Transactional
   private UserResponse registerInternal(Domain domain, UserRegistrationRequest request) {
     Long domainId = domain.getId();
-    log.info(
-        "DB call userRepository.existsByDomainIdAndEmail domainId={} email={} source=registerInternal",
-        domainId,
-        request.email());
-    if (userRepository.existsByDomainIdAndEmail(domainId, request.email())) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists in domain");
-    }
-
+    String email = request.email() == null ? null : request.email().trim();
     User user = User.builder()
         .domain(domain)
-        .email(request.email())
+        .email(email)
+        .emailPending(email)
         .passwordHash(passwordEncoder.encode(requirePassword(request.password())))
         .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
         .build();
 
     applyProfileValues(user, domainId, request.values());
     log.info(
-        "DB call userRepository.save domainId={} email={} source=registerInternal",
+        "DB call userRepository.saveAndFlush domainId={} emailPending={} source=registerInternal",
         domainId,
-        user.getEmail());
-    User saved = userRepository.save(user);
+        user.getEmailPending());
+    User saved;
+    try {
+      saved = userRepository.saveAndFlush(user);
+    } catch (DataIntegrityViolationException ex) {
+      if (isDuplicateUserEmailViolation(ex)) {
+        log.warn(
+            "DB duplicate user registration domainId={} emailPending={}",
+            domainId,
+            user.getEmailPending());
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "User already registered");
+      }
+      throw ex;
+    }
     log.info(
-        "DB result userRepository.save userId={} domainId={} email={} source=registerInternal",
+        "DB result userRepository.saveAndFlush userId={} domainId={} email={} emailPending={} source=registerInternal",
         saved.getId(),
         domainId,
-        saved.getEmail());
+        saved.getEmail(),
+        saved.getEmailPending());
     String otpCode = userOtpService.createVerificationCode(saved);
-    emailService.sendOtpEmail(domain, saved.getEmail(), otpCode);
+    emailService.sendOtpEmail(domain, resolveVerificationEmail(saved), otpCode);
     return toResponse(saved);
   }
 
@@ -186,22 +194,17 @@ public class UserService {
       user.setPasswordHash(passwordEncoder.encode(request.password()));
     }
     if (request.email() != null && !request.email().isBlank()) {
-      log.info(
-          "DB call userRepository.existsByDomainIdAndEmail domainId={} email={} source=updateInternal",
-          domainId,
-          request.email());
-      if (!request.email().equals(user.getEmail())
-          && userRepository.existsByDomainIdAndEmail(domainId, request.email())) {
-        throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists in domain");
-      }
-      if (!request.email().equals(user.getEmail())) {
+      String requestedEmail = request.email().trim();
+      String currentEmail = resolveDisplayedEmail(user);
+      if (currentEmail == null || !requestedEmail.equals(currentEmail)) {
         emailChanged = true;
       }
-      user.setEmail(request.email());
+      user.setEmailPending(requestedEmail);
     }
 
     if (allowConfirmed && request.confirmed() != null) {
       if (request.confirmed()) {
+        user.setEmail(requireValue(user.getEmailPending(), "emailPending"));
         user.setEmailVerifiedAt(OffsetDateTime.now(ZoneOffset.UTC));
       } else {
         user.setEmailVerifiedAt(null);
@@ -213,25 +216,41 @@ public class UserService {
       applyProfileValues(user, domainId, request.values());
     }
 
-    String otpCode = null;
-    if (emailChanged && (!allowConfirmed || request.confirmed() == null || !request.confirmed())) {
+    boolean sendVerificationOtp = emailChanged && (!allowConfirmed || request.confirmed() == null || !request.confirmed());
+    if (sendVerificationOtp) {
       user.setEmailVerifiedAt(null);
-      otpCode = userOtpService.createVerificationCode(user);
     }
 
     log.info(
-        "DB call userRepository.save userId={} domainId={} email={} source=updateInternal",
+        "DB call userRepository.saveAndFlush userId={} domainId={} email={} emailPending={} source=updateInternal",
         user.getId(),
         domainId,
-        user.getEmail());
-    User saved = userRepository.save(user);
+        user.getEmail(),
+        user.getEmailPending());
+    User saved;
+    try {
+      saved = userRepository.saveAndFlush(user);
+    } catch (DataIntegrityViolationException ex) {
+      if (isDuplicateUserEmailViolation(ex)) {
+        log.warn(
+            "DB duplicate user update userId={} domainId={} email={} emailPending={}",
+            user.getId(),
+            domainId,
+            user.getEmail(),
+            user.getEmailPending());
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "User already registered");
+      }
+      throw ex;
+    }
     log.info(
-        "DB result userRepository.save userId={} domainId={} email={} source=updateInternal",
+        "DB result userRepository.saveAndFlush userId={} domainId={} email={} emailPending={} source=updateInternal",
         saved.getId(),
         domainId,
-        saved.getEmail());
-    if (otpCode != null) {
-      emailService.sendOtpEmail(user.getDomain(), saved.getEmail(), otpCode);
+        saved.getEmail(),
+        saved.getEmailPending());
+    if (sendVerificationOtp) {
+      String otpCode = userOtpService.createVerificationCode(saved);
+      emailService.sendOtpEmail(user.getDomain(), resolveVerificationEmail(saved), otpCode);
     }
     return toResponse(saved);
   }
@@ -325,6 +344,18 @@ public class UserService {
     return userProfileValueRepository.findByUserId(userId);
   }
 
+  private boolean isDuplicateUserEmailViolation(DataIntegrityViolationException ex) {
+    String message = ex.getMessage();
+    if (message == null) {
+      return false;
+    }
+    String normalized = message.toLowerCase();
+    return normalized.contains("uk_users_domain_email")
+        || normalized.contains("uk_users_domain_email_pending")
+        || normalized.contains("duplicate key")
+        || normalized.contains("unique index or primary key violation");
+  }
+
   private void applyValue(UserProfileValue value, FieldType type, UserProfileValueRequest request) {
     switch (type) {
       case STRING -> {
@@ -410,7 +441,22 @@ public class UserService {
     }
 
     boolean confirmed = user.getEmailVerifiedAt() != null;
-    return new UserResponse(user.getId(), user.getEmail(), confirmed, user.getCreatedAt(), values);
+    return new UserResponse(user.getId(), resolveDisplayedEmail(user), confirmed, user.getCreatedAt(), values);
+  }
+
+  private String resolveDisplayedEmail(User user) {
+    if (user.getEmail() != null && !user.getEmail().isBlank()) {
+      return user.getEmail();
+    }
+    return user.getEmailPending();
+  }
+
+  private String resolveVerificationEmail(User user) {
+    String email = resolveDisplayedEmail(user);
+    if (email == null || email.isBlank()) {
+      throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "User email is not set");
+    }
+    return email;
   }
 
   private UserProfileValueResponse toResponse(UserProfileValue value) {

@@ -51,7 +51,7 @@ class DomainUserAuthServiceTests {
     Domain domain = Domain.builder().id(7L).name("example.org").build();
     User user = User.builder()
         .domain(domain)
-        .email("user@example.org")
+        .emailPending("user@example.org")
         .passwordHash("hash")
         .createdAt(OffsetDateTime.now())
         .build();
@@ -62,9 +62,10 @@ class DomainUserAuthServiceTests {
     ApiMessage response = domainUserAuthService.confirm(7L, new UserConfirmRequest("abc123"));
 
     assertThat(response.message()).isEqualTo("ok");
+    assertThat(user.getEmail()).isEqualTo("user@example.org");
     assertThat(user.getEmailVerifiedAt()).isNotNull();
     verify(userOtpService).clearVerificationCode(user);
-    verify(userRepository).save(user);
+    verify(userRepository).saveAndFlush(user);
   }
 
   @Test
@@ -72,7 +73,7 @@ class DomainUserAuthServiceTests {
     Domain domain = Domain.builder().id(7L).name("example.org").build();
     User user = User.builder()
         .domain(domain)
-        .email("user@example.org")
+        .emailPending("user@example.org")
         .passwordHash("hash")
         .createdAt(OffsetDateTime.now())
         .build();

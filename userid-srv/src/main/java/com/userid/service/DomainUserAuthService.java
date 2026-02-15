@@ -19,10 +19,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
@@ -37,6 +39,7 @@ public class DomainUserAuthService {
 
   public UserLoginResponse login(Long domainId, UserLoginRequest request) {
     User user = userRepository.findByDomainIdAndEmail(domainId, request.email())
+        .or(() -> userRepository.findByDomainIdAndEmailPending(domainId, request.email()))
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
     if (user.getEmailVerifiedAt() == null) {
@@ -50,15 +53,25 @@ public class DomainUserAuthService {
     return new UserLoginResponse(token, toAuthResponse(user));
   }
 
+  @Transactional
   public ApiMessage confirm(Long domainId, UserConfirmRequest request) {
     OtpUser otp = userOtpService.requireValid(OtpType.VERIFICATION, request.code());
     User user = otp.getUser();
     if (!domainId.equals(user.getDomain().getId())) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Domain mismatch");
     }
+    String pendingEmail = resolveVerificationEmail(user);
+    user.setEmail(pendingEmail);
     user.setEmailVerifiedAt(OffsetDateTime.now(ZoneOffset.UTC));
+    try {
+      userRepository.saveAndFlush(user);
+    } catch (DataIntegrityViolationException ex) {
+      if (isDuplicateUserEmailViolation(ex)) {
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "User already registered");
+      }
+      throw ex;
+    }
     userOtpService.clearVerificationCode(user);
-    userRepository.save(user);
     return new ApiMessage("ok");
   }
 
@@ -106,10 +119,10 @@ public class DomainUserAuthService {
 
   public ApiMessage resendVerification(Long domainId, UserForgotPasswordRequest request) {
     User user = userRepository.findByDomainIdAndEmail(domainId, request.email())
+        .or(() -> userRepository.findByDomainIdAndEmailPending(domainId, request.email()))
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     String code = userOtpService.createVerificationCode(user);
-    userRepository.save(user);
-    emailService.sendOtpEmail(user.getDomain(), user.getEmail(), code);
+    emailService.sendOtpEmail(user.getDomain(), resolveVerificationEmail(user), code);
     return new ApiMessage("ok");
   }
 
@@ -137,5 +150,27 @@ public class DomainUserAuthService {
         user.getEmailVerifiedAt() != null,
         user.getCreatedAt()
     );
+  }
+
+  private String resolveVerificationEmail(User user) {
+    if (user.getEmailPending() != null && !user.getEmailPending().isBlank()) {
+      return user.getEmailPending();
+    }
+    if (user.getEmail() != null && !user.getEmail().isBlank()) {
+      return user.getEmail();
+    }
+    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User email is not set");
+  }
+
+  private boolean isDuplicateUserEmailViolation(DataIntegrityViolationException ex) {
+    String message = ex.getMessage();
+    if (message == null) {
+      return false;
+    }
+    String normalized = message.toLowerCase();
+    return normalized.contains("uk_users_domain_email")
+        || normalized.contains("uk_users_domain_email_pending")
+        || normalized.contains("duplicate key")
+        || normalized.contains("unique index or primary key violation");
   }
 }

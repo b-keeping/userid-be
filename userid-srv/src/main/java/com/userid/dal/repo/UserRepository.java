@@ -9,5 +9,7 @@ public interface UserRepository extends JpaRepository<User, Long>, UserRepositor
 
   Optional<User> findByDomainIdAndEmail(Long domainId, String email);
 
+  Optional<User> findByDomainIdAndEmailPending(Long domainId, String emailPending);
+
   boolean existsByDomainIdAndEmail(Long domainId, String email);
 }
