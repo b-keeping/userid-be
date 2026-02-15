@@ -24,4 +24,12 @@ public final class UseridApiEndpoints {
   public static String externalDomainUsersConfirm(Long domainId) {
     return externalDomainUsers(domainId) + CONFIRM;
   }
+
+  public static String externalDomainUsersLogin(Long domainId) {
+    return externalDomainUsers(domainId) + LOGIN;
+  }
+
+  public static String externalDomainUsersMe(Long domainId) {
+    return externalDomainUsers(domainId) + ME;
+  }
 }

@@ -27,6 +27,10 @@ public class AuthServerApiClient {
   private final AuthServerApiProperties properties;
   private final ObjectMapper objectMapper;
 
+  public boolean isEnabled() {
+    return properties.isEnabled();
+  }
+
   public void register(AuthServerRegisterRequest request) {
     if (!properties.isEnabled()) {
       return;
@@ -37,7 +41,13 @@ public class AuthServerApiClient {
     String endpoint = "%s%s".formatted(
         normalizeBaseUrl(properties.getBaseUrl()),
         UseridApiEndpoints.externalDomainUsers(properties.getDomainId()));
-    log.info("Auth server register request url={} payload={}", endpoint, toJson(request));
+    int valuesCount = request.values() == null ? 0 : request.values().size();
+    log.info(
+        "Auth server register start url={} domainId={} email={} valuesCount={}",
+        endpoint,
+        properties.getDomainId(),
+        request.email(),
+        valuesCount);
 
     try {
       restTemplate.exchange(
@@ -45,9 +55,25 @@ public class AuthServerApiClient {
           HttpMethod.POST,
           new HttpEntity<>(request, requestHeaders()),
           Void.class);
+      log.info(
+          "Auth server register success domainId={} email={}",
+          properties.getDomainId(),
+          request.email());
     } catch (HttpStatusCodeException ex) {
-      throw mapStatusException(ex, "Registration failed on auth server");
+      ResponseStatusException mapped = mapStatusException(ex, "Registration failed on auth server");
+      log.warn(
+          "Auth server register failed domainId={} email={} status={} message={}",
+          properties.getDomainId(),
+          request.email(),
+          ex.getStatusCode(),
+          mapped.getReason());
+      throw mapped;
     } catch (ResourceAccessException ex) {
+      log.warn(
+          "Auth server register failed domainId={} email={} reason={}",
+          properties.getDomainId(),
+          request.email(),
+          ex.getMessage());
       throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Registration server is unavailable");
     }
   }
@@ -62,6 +88,12 @@ public class AuthServerApiClient {
     String endpoint = "%s%s".formatted(
         normalizeBaseUrl(properties.getBaseUrl()),
         UseridApiEndpoints.externalDomainUsersConfirm(properties.getDomainId()));
+    int codeLength = code == null ? 0 : code.length();
+    log.info(
+        "Auth server confirm start url={} domainId={} codeLength={}",
+        endpoint,
+        properties.getDomainId(),
+        codeLength);
 
     try {
       restTemplate.exchange(
@@ -69,9 +101,119 @@ public class AuthServerApiClient {
           HttpMethod.POST,
           new HttpEntity<>(new AuthServerConfirmRequest(code), requestHeaders()),
           Void.class);
+      log.info("Auth server confirm success domainId={} codeLength={}", properties.getDomainId(), codeLength);
     } catch (HttpStatusCodeException ex) {
-      throw mapStatusException(ex, "Confirmation failed on auth server");
+      ResponseStatusException mapped = mapStatusException(ex, "Confirmation failed on auth server");
+      log.warn(
+          "Auth server confirm failed domainId={} status={} message={}",
+          properties.getDomainId(),
+          ex.getStatusCode(),
+          mapped.getReason());
+      throw mapped;
     } catch (ResourceAccessException ex) {
+      log.warn(
+          "Auth server confirm failed domainId={} reason={}",
+          properties.getDomainId(),
+          ex.getMessage());
+      throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Registration server is unavailable");
+    }
+  }
+
+  public AuthServerLoginResponse login(AuthServerLoginRequest request) {
+    if (!properties.isEnabled()) {
+      return null;
+    }
+
+    requireConfigured();
+
+    String endpoint = "%s%s".formatted(
+        normalizeBaseUrl(properties.getBaseUrl()),
+        UseridApiEndpoints.externalDomainUsersLogin(properties.getDomainId()));
+    log.info(
+        "Auth server login start url={} domainId={} email={}",
+        endpoint,
+        properties.getDomainId(),
+        request.email());
+
+    try {
+      AuthServerLoginResponse response = restTemplate.exchange(
+              endpoint,
+              HttpMethod.POST,
+              new HttpEntity<>(request, requestHeaders()),
+              AuthServerLoginResponse.class)
+          .getBody();
+      log.info(
+          "Auth server login success domainId={} email={} hasToken={}",
+          properties.getDomainId(),
+          request.email(),
+          response != null && StringUtils.hasText(response.token()));
+      return response;
+    } catch (HttpStatusCodeException ex) {
+      ResponseStatusException mapped = mapStatusException(ex, "Login failed on auth server");
+      log.warn(
+          "Auth server login failed domainId={} email={} status={} message={}",
+          properties.getDomainId(),
+          request.email(),
+          ex.getStatusCode(),
+          mapped.getReason());
+      throw mapped;
+    } catch (ResourceAccessException ex) {
+      log.warn(
+          "Auth server login failed domainId={} email={} reason={}",
+          properties.getDomainId(),
+          request.email(),
+          ex.getMessage());
+      throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Registration server is unavailable");
+    }
+  }
+
+  public void updateSelf(String userJwtToken, AuthServerUserSelfUpdateRequest request) {
+    if (!properties.isEnabled()) {
+      return;
+    }
+
+    requireConfigured();
+
+    if (!StringUtils.hasText(userJwtToken)) {
+      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing external user token");
+    }
+
+    String endpoint = "%s%s".formatted(
+        normalizeBaseUrl(properties.getBaseUrl()),
+        UseridApiEndpoints.externalDomainUsersMe(properties.getDomainId()));
+    int valuesCount = request.values() == null ? 0 : request.values().size();
+    boolean passwordProvided = StringUtils.hasText(request.password());
+    log.info(
+        "Auth server user update start url={} domainId={} valuesCount={} passwordProvided={}",
+        endpoint,
+        properties.getDomainId(),
+        valuesCount,
+        passwordProvided);
+
+    try {
+      restTemplate.exchange(
+          endpoint,
+          HttpMethod.PUT,
+          new HttpEntity<>(request, userJwtHeaders(userJwtToken)),
+          Void.class);
+      log.info(
+          "Auth server user update success domainId={} valuesCount={} passwordProvided={}",
+          properties.getDomainId(),
+          valuesCount,
+          passwordProvided);
+    } catch (HttpStatusCodeException ex) {
+      ResponseStatusException mapped = mapStatusException(ex, "User update failed on auth server");
+      log.warn(
+          "Auth server user update failed domainId={} status={} message={}",
+          properties.getDomainId(),
+          ex.getStatusCode(),
+          mapped.getReason());
+      throw mapped;
+    } catch (ResourceAccessException ex) {
+      log.warn(
+          "Auth server user update failed domainId={} reason={}",
+          properties.getDomainId(),
+          ex.getMessage());
       throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Registration server is unavailable");
     }
   }
@@ -89,6 +231,13 @@ public class AuthServerApiClient {
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_JSON);
     headers.setBearerAuth(properties.getApiToken().trim());
+    return headers;
+  }
+
+  private HttpHeaders userJwtHeaders(String userJwtToken) {
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_JSON);
+    headers.setBearerAuth(userJwtToken.trim());
     return headers;
   }
 

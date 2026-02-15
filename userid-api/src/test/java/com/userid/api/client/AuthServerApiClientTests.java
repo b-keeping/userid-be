@@ -1,5 +1,6 @@
 package com.userid.api.client;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
@@ -69,6 +70,57 @@ class AuthServerApiClientTests {
         .andRespond(withSuccess());
 
     authServerApiClient.confirm("abc123");
+
+    server.verify();
+  }
+
+  @Test
+  void loginCallsDomainEndpointAndReturnsPayload() {
+    server.expect(requestTo("https://auth.example.org/api/external/domains/55/users/login"))
+        .andExpect(method(HttpMethod.POST))
+        .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer domain-token"))
+        .andExpect(jsonPath("$.email").value("user@example.org"))
+        .andExpect(jsonPath("$.password").value("secret"))
+        .andRespond(withSuccess("""
+            {
+              "token": "user-jwt-token",
+              "user": {
+                "id": 101,
+                "email": "user@example.org",
+                "confirmed": true,
+                "domainId": 5
+              }
+            }
+            """, MediaType.APPLICATION_JSON));
+
+    AuthServerLoginResponse response = authServerApiClient.login(
+        new AuthServerLoginRequest("user@example.org", "secret"));
+
+    server.verify();
+    assertThat(response).isNotNull();
+    assertThat(response.token()).isEqualTo("user-jwt-token");
+    assertThat(response.user()).isNotNull();
+    assertThat(response.user().id()).isEqualTo(101L);
+    assertThat(response.user().email()).isEqualTo("user@example.org");
+    assertThat(response.user().confirmed()).isTrue();
+    assertThat(response.user().domainId()).isEqualTo(5L);
+  }
+
+  @Test
+  void updateSelfUsesUserJwtToken() {
+    server.expect(requestTo("https://auth.example.org/api/external/domains/55/users/me"))
+        .andExpect(method(HttpMethod.PUT))
+        .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer user-jwt-token"))
+        .andExpect(jsonPath("$.password").value("new-secret"))
+        .andExpect(jsonPath("$.values[0].fieldId").value(13))
+        .andExpect(jsonPath("$.values[0].stringValue").value("Иван"))
+        .andRespond(withSuccess());
+
+    authServerApiClient.updateSelf(
+        "user-jwt-token",
+        new AuthServerUserSelfUpdateRequest(
+            "new-secret",
+            List.of(AuthServerProfileValue.stringValue(13L, "Имя", "Иван"))));
 
     server.verify();
   }
