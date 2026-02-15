@@ -32,4 +32,12 @@ public final class UseridApiEndpoints {
   public static String externalDomainUsersMe(Long domainId) {
     return externalDomainUsers(domainId) + ME;
   }
+
+  public static String externalDomainUsersForgotPassword(Long domainId) {
+    return externalDomainUsers(domainId) + FORGOT_PASSWORD;
+  }
+
+  public static String externalDomainUsersResetPassword(Long domainId) {
+    return externalDomainUsers(domainId) + RESET_PASSWORD;
+  }
 }

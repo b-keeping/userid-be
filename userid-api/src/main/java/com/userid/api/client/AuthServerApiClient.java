@@ -167,6 +167,95 @@ public class AuthServerApiClient {
     }
   }
 
+  public void forgotPassword(AuthServerForgotPasswordRequest request) {
+    if (!properties.isEnabled()) {
+      return;
+    }
+
+    requireConfigured();
+
+    String endpoint = "%s%s".formatted(
+        normalizeBaseUrl(properties.getBaseUrl()),
+        UseridApiEndpoints.externalDomainUsersForgotPassword(properties.getDomainId()));
+    log.info(
+        "Auth server forgot-password start url={} domainId={} email={}",
+        endpoint,
+        properties.getDomainId(),
+        request.email());
+
+    try {
+      restTemplate.exchange(
+          endpoint,
+          HttpMethod.POST,
+          new HttpEntity<>(request, requestHeaders()),
+          Void.class);
+      log.info(
+          "Auth server forgot-password success domainId={} email={}",
+          properties.getDomainId(),
+          request.email());
+    } catch (HttpStatusCodeException ex) {
+      ResponseStatusException mapped = mapStatusException(ex, "Forgot password failed on auth server");
+      log.warn(
+          "Auth server forgot-password failed domainId={} email={} status={} message={}",
+          properties.getDomainId(),
+          request.email(),
+          ex.getStatusCode(),
+          mapped.getReason());
+      throw mapped;
+    } catch (ResourceAccessException ex) {
+      log.warn(
+          "Auth server forgot-password failed domainId={} email={} reason={}",
+          properties.getDomainId(),
+          request.email(),
+          ex.getMessage());
+      throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Registration server is unavailable");
+    }
+  }
+
+  public void resetPassword(AuthServerResetPasswordRequest request) {
+    if (!properties.isEnabled()) {
+      return;
+    }
+
+    requireConfigured();
+
+    String endpoint = "%s%s".formatted(
+        normalizeBaseUrl(properties.getBaseUrl()),
+        UseridApiEndpoints.externalDomainUsersResetPassword(properties.getDomainId()));
+    int codeLength = request.code() == null ? 0 : request.code().length();
+    log.info(
+        "Auth server reset-password start url={} domainId={} codeLength={}",
+        endpoint,
+        properties.getDomainId(),
+        codeLength);
+
+    try {
+      restTemplate.exchange(
+          endpoint,
+          HttpMethod.POST,
+          new HttpEntity<>(request, requestHeaders()),
+          Void.class);
+      log.info(
+          "Auth server reset-password success domainId={} codeLength={}",
+          properties.getDomainId(),
+          codeLength);
+    } catch (HttpStatusCodeException ex) {
+      ResponseStatusException mapped = mapStatusException(ex, "Reset password failed on auth server");
+      log.warn(
+          "Auth server reset-password failed domainId={} status={} message={}",
+          properties.getDomainId(),
+          ex.getStatusCode(),
+          mapped.getReason());
+      throw mapped;
+    } catch (ResourceAccessException ex) {
+      log.warn(
+          "Auth server reset-password failed domainId={} reason={}",
+          properties.getDomainId(),
+          ex.getMessage());
+      throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Registration server is unavailable");
+    }
+  }
+
   public void updateSelf(String userJwtToken, AuthServerUserSelfUpdateRequest request) {
     if (!properties.isEnabled()) {
       return;
