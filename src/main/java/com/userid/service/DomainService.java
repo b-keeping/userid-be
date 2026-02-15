@@ -30,11 +30,14 @@ import org.springframework.web.server.ResponseStatusException;
 @RequiredArgsConstructor
 public class DomainService {
   private static final Logger log = LoggerFactory.getLogger(DomainService.class);
+  private static final String PSRP_HOST_PREFIX = "psrp.";
+  private static final String PSRP_VALUE = "v=spf1 a:post.userid.sh -all";
   private final DomainRepository domainRepository;
   private final OwnerDomainRepository ownerDomainRepository;
   private final OwnerRepository ownerRepository;
   private final AccessService accessService;
   private final PostalAdminClient postalAdminClient;
+  private final DnsLookupService dnsLookupService;
   private final DomainJwtSecretService domainJwtSecretService;
   private final DomainApiTokenService domainApiTokenService;
   @org.springframework.beans.factory.annotation.Value("${auth.postal-admin.organization:Org1}")
@@ -123,6 +126,7 @@ public class DomainService {
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found"));
 
     String serverName = buildServerName(domain.getName());
+    boolean psrpOk = false;
     try {
       PostalAdminClient.VerifyCheckResponse verifyResponse =
           postalAdminClient.verifyCheck(postalOrganization, serverName, domain.getName());
@@ -145,17 +149,28 @@ public class DomainService {
       applyRecord(findRecord(records, "dkim"), domain::setDkim, domain::setDkimHost, domain::setDkimType, null, null, domain::setDkimStt);
       applyRecord(findRecord(records, "return_path"), domain::setReturnPath, domain::setReturnPathHost, domain::setReturnPathType, null, null, domain::setReturnPathStt);
       applyRecord(findRecord(records, "mx"), domain::setMx, domain::setMxHost, domain::setMxType, domain::setMxPriority, domain::setMxOptional, domain::setMxStt);
+      psrpOk = dnsLookupService.hasTxtRecord(psrpHost(domain.getName()), PSRP_VALUE);
+      domain.setPsrpStt(psrpOk);
 
-      if (verifyResponse.ok() && dnsResponse.ok()) {
+      if (verifyResponse.ok() && dnsResponse.ok() && psrpOk) {
         domain.setDnsStatus("ok");
         domain.setDnsError(null);
       } else {
         domain.setDnsStatus("error");
-        domain.setDnsError(firstError(verifyResponse.error(), dnsResponse.error()));
+        String error = firstError(verifyResponse.error(), dnsResponse.error());
+        if (!psrpOk) {
+          error = appendError(error, psrpMissingError(domain.getName()));
+        }
+        domain.setDnsError(error);
       }
     } catch (ResponseStatusException ex) {
       domain.setDnsStatus("error");
       domain.setDnsError(ex.getReason());
+      psrpOk = dnsLookupService.hasTxtRecord(psrpHost(domain.getName()), PSRP_VALUE);
+      domain.setPsrpStt(psrpOk);
+      if (!psrpOk) {
+        domain.setDnsError(appendError(domain.getDnsError(), psrpMissingError(domain.getName())));
+      }
     }
 
     return toResponse(domainRepository.save(domain));
@@ -269,6 +284,7 @@ public class DomainService {
         verified ? domain.getMxPriority() : null,
         verified ? domain.getMxOptional() : null,
         verified ? domain.getMxStt() : null,
+        verified ? domain.getPsrpStt() : null,
         verified ? domain.getReturnPath() : null,
         verified ? domain.getReturnPathHost() : null,
         verified ? domain.getReturnPathType() : null,
@@ -387,6 +403,7 @@ public class DomainService {
           domain.setDkimStt(false);
           domain.setReturnPathStt(false);
           domain.setMxStt(false);
+          domain.setPsrpStt(false);
         }
         log.info("DNS records saved domainId={}", domain.getId());
       }
@@ -520,5 +537,23 @@ public class DomainService {
       return secondary;
     }
     return null;
+  }
+
+  private String appendError(String base, String extra) {
+    if (extra == null || extra.isBlank()) {
+      return base;
+    }
+    if (base == null || base.isBlank()) {
+      return extra;
+    }
+    return base + "; " + extra;
+  }
+
+  private String psrpHost(String domainName) {
+    return PSRP_HOST_PREFIX + domainName;
+  }
+
+  private String psrpMissingError(String domainName) {
+    return "TXT " + psrpHost(domainName) + " = " + PSRP_VALUE + " not found";
   }
 }
