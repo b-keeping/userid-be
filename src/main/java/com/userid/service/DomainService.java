@@ -147,29 +147,54 @@ public class DomainService {
       JsonNode records = dnsResponse.records();
       applyRecord(findRecord(records, "spf"), domain::setSpf, domain::setSpfHost, domain::setSpfType, null, null, domain::setSpfStt);
       applyRecord(findRecord(records, "dkim"), domain::setDkim, domain::setDkimHost, domain::setDkimType, null, null, domain::setDkimStt);
-      applyRecord(findRecord(records, "return_path"), domain::setReturnPath, domain::setReturnPathHost, domain::setReturnPathType, null, null, domain::setReturnPathStt);
       applyRecord(findRecord(records, "mx"), domain::setMx, domain::setMxHost, domain::setMxType, domain::setMxPriority, domain::setMxOptional, domain::setMxStt);
-      psrpOk = dnsLookupService.hasTxtRecord(psrpHost(domain.getName()), PSRP_VALUE);
-      domain.setPsrpStt(psrpOk);
+      domain.setReturnPath(PSRP_VALUE);
+      domain.setReturnPathHost(psrpHost(domain.getName()));
+      domain.setReturnPathType("TXT");
 
-      if (verifyResponse.ok() && dnsResponse.ok() && psrpOk) {
+      boolean spfOk = requiredRecordOk(records, "spf");
+      boolean dkimOk = requiredRecordOk(records, "dkim");
+      boolean mxOk = requiredRecordOk(records, "mx");
+      psrpOk = dnsLookupService.hasTxtRecord(psrpHost(domain.getName()), PSRP_VALUE);
+      domain.setReturnPathStt(psrpOk);
+
+      String error = null;
+      if (!verifyResponse.ok()) {
+        error = appendError(error, firstError(verifyResponse.error(), "Domain verification check failed"));
+      }
+      if (records == null && !dnsResponse.ok()) {
+        error = appendError(error, firstError(dnsResponse.error(), "DNS check failed"));
+      }
+      if (!spfOk) {
+        error = appendError(error, "SPF record is not valid");
+      }
+      if (!dkimOk) {
+        error = appendError(error, "DKIM record is not valid");
+      }
+      if (!mxOk) {
+        error = appendError(error, "MX record is not valid");
+      }
+      if (!psrpOk) {
+        error = appendError(error, returnPathMissingError(domain.getName()));
+      }
+
+      if (error == null) {
         domain.setDnsStatus("ok");
         domain.setDnsError(null);
       } else {
         domain.setDnsStatus("error");
-        String error = firstError(verifyResponse.error(), dnsResponse.error());
-        if (!psrpOk) {
-          error = appendError(error, psrpMissingError(domain.getName()));
-        }
         domain.setDnsError(error);
       }
     } catch (ResponseStatusException ex) {
       domain.setDnsStatus("error");
       domain.setDnsError(ex.getReason());
       psrpOk = dnsLookupService.hasTxtRecord(psrpHost(domain.getName()), PSRP_VALUE);
-      domain.setPsrpStt(psrpOk);
+      domain.setReturnPath(PSRP_VALUE);
+      domain.setReturnPathHost(psrpHost(domain.getName()));
+      domain.setReturnPathType("TXT");
+      domain.setReturnPathStt(psrpOk);
       if (!psrpOk) {
-        domain.setDnsError(appendError(domain.getDnsError(), psrpMissingError(domain.getName())));
+        domain.setDnsError(appendError(domain.getDnsError(), returnPathMissingError(domain.getName())));
       }
     }
 
@@ -284,7 +309,6 @@ public class DomainService {
         verified ? domain.getMxPriority() : null,
         verified ? domain.getMxOptional() : null,
         verified ? domain.getMxStt() : null,
-        verified ? domain.getPsrpStt() : null,
         verified ? domain.getReturnPath() : null,
         verified ? domain.getReturnPathHost() : null,
         verified ? domain.getReturnPathType() : null,
@@ -360,19 +384,12 @@ public class DomainService {
           if (changedDkim) {
             domain.setDkimStt(false);
           }
-          boolean changedReturnPath = applyRecordIfChanged(
-              findRecord(records, "return_path"),
-              domain.getReturnPath(),
-              domain.getReturnPathHost(),
-              domain.getReturnPathType(),
-              null,
-              null,
-              domain::setReturnPath,
-              domain::setReturnPathHost,
-              domain::setReturnPathType,
-              null,
-              null
-          );
+          boolean changedReturnPath = !Objects.equals(domain.getReturnPath(), PSRP_VALUE)
+              || !Objects.equals(domain.getReturnPathHost(), psrpHost(domain.getName()))
+              || !Objects.equals(domain.getReturnPathType(), "TXT");
+          domain.setReturnPath(PSRP_VALUE);
+          domain.setReturnPathHost(psrpHost(domain.getName()));
+          domain.setReturnPathType("TXT");
           if (changedReturnPath) {
             domain.setReturnPathStt(false);
           }
@@ -396,14 +413,15 @@ public class DomainService {
           applyRecord(findRecord(records, "verification"), domain::setVerify, domain::setVerifyHost, domain::setVerifyType, null, null, null);
           applyRecord(findRecord(records, "spf"), domain::setSpf, domain::setSpfHost, domain::setSpfType, null, null, null);
           applyRecord(findRecord(records, "dkim"), domain::setDkim, domain::setDkimHost, domain::setDkimType, null, null, null);
-          applyRecord(findRecord(records, "return_path"), domain::setReturnPath, domain::setReturnPathHost, domain::setReturnPathType, null, null, null);
+          domain.setReturnPath(PSRP_VALUE);
+          domain.setReturnPathHost(psrpHost(domain.getName()));
+          domain.setReturnPathType("TXT");
           applyRecord(findRecord(records, "mx"), domain::setMx, domain::setMxHost, domain::setMxType, domain::setMxPriority, domain::setMxOptional, null);
           domain.setVerifyStt(false);
           domain.setSpfStt(false);
           domain.setDkimStt(false);
           domain.setReturnPathStt(false);
           domain.setMxStt(false);
-          domain.setPsrpStt(false);
         }
         log.info("DNS records saved domainId={}", domain.getId());
       }
@@ -549,11 +567,19 @@ public class DomainService {
     return base + "; " + extra;
   }
 
+  private boolean requiredRecordOk(JsonNode records, String id) {
+    JsonNode record = findRecord(records, id);
+    if (record == null || record.isMissingNode()) {
+      return false;
+    }
+    return record.path("ok").asBoolean(false);
+  }
+
   private String psrpHost(String domainName) {
     return PSRP_HOST_PREFIX + domainName;
   }
 
-  private String psrpMissingError(String domainName) {
-    return "TXT " + psrpHost(domainName) + " = " + PSRP_VALUE + " not found";
+  private String returnPathMissingError(String domainName) {
+    return "Return Path TXT " + psrpHost(domainName) + " = " + PSRP_VALUE + " not found";
   }
 }

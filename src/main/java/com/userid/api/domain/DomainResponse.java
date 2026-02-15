@@ -23,7 +23,6 @@ public record DomainResponse(
     Integer mxPriority,
     Boolean mxOptional,
     Boolean mxStt,
-    Boolean psrpStt,
     String returnPath,
     String returnPathHost,
     String returnPathType,

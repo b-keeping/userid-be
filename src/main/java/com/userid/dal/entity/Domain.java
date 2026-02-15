@@ -91,9 +91,6 @@ public class Domain {
   @Column(name = "mx_stt")
   private Boolean mxStt;
 
-  @Column(name = "psrp_stt")
-  private Boolean psrpStt;
-
   @Column(name = "return_path", length = 1024)
   private String returnPath;
 
