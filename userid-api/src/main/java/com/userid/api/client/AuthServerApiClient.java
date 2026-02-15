@@ -1,8 +1,11 @@
 package com.userid.api.client;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -15,12 +18,14 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 @RequiredArgsConstructor
+@Slf4j
 public class AuthServerApiClient {
   private static final Pattern MESSAGE_PATTERN =
       Pattern.compile("\\\"message\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"");
 
   private final RestTemplate restTemplate;
   private final AuthServerApiProperties properties;
+  private final ObjectMapper objectMapper;
 
   public void register(AuthServerRegisterRequest request) {
     if (!properties.isEnabled()) {
@@ -32,6 +37,7 @@ public class AuthServerApiClient {
     String endpoint = "%s%s".formatted(
         normalizeBaseUrl(properties.getBaseUrl()),
         UseridApiEndpoints.externalDomainUsers(properties.getDomainId()));
+    log.info("Auth server register request url={} payload={}", endpoint, toJson(request));
 
     try {
       restTemplate.exchange(
@@ -67,6 +73,15 @@ public class AuthServerApiClient {
       throw mapStatusException(ex, "Confirmation failed on auth server");
     } catch (ResourceAccessException ex) {
       throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Registration server is unavailable");
+    }
+  }
+
+  private String toJson(Object payload) {
+    try {
+      return objectMapper.writeValueAsString(payload);
+    } catch (JsonProcessingException ex) {
+      log.warn("Failed to serialize auth server payload", ex);
+      return "<serialization-error>";
     }
   }
 

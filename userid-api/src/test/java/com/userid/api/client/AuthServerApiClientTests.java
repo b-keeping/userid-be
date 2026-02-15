@@ -8,6 +8,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withBadRequest;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,7 +34,8 @@ class AuthServerApiClientTests {
     properties.setBaseUrl("https://auth.example.org");
     properties.setDomainId(55L);
     properties.setApiToken("domain-token");
-    authServerApiClient = new AuthServerApiClient(restTemplate, properties);
+    authServerApiClient =
+        new AuthServerApiClient(restTemplate, properties, new ObjectMapper().findAndRegisterModules());
     server = MockRestServiceServer.bindTo(restTemplate).build();
   }
 

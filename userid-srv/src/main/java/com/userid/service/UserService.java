@@ -30,13 +30,16 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class UserService {
   private final DomainRepository domainRepository;
   private final ProfileFieldRepository profileFieldRepository;
@@ -48,16 +51,18 @@ public class UserService {
   private final EmailService emailService;
   private final UserOtpService userOtpService;
 
-  @org.springframework.transaction.annotation.Transactional
+  @Transactional
   public UserResponse register(Long serviceUserId, Long domainId, UserRegistrationRequest request) {
     accessService.requireDomainAccess(serviceUserId, domainId);
+    log.info("DB call domainRepository.findById domainId={} source=register", domainId);
     Domain domain = domainRepository.findById(domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found"));
     return registerInternal(domain, request);
   }
 
-  @org.springframework.transaction.annotation.Transactional
+  @Transactional
   public UserResponse registerByDomain(Long domainId, UserRegistrationRequest request) {
+    log.info("DB call domainRepository.findById domainId={} source=registerByDomain", domainId);
     Domain domain = domainRepository.findById(domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found"));
     return registerInternal(domain, request);
@@ -65,6 +70,7 @@ public class UserService {
 
   public UserResponse get(Long serviceUserId, Long domainId, Long userId) {
     accessService.requireDomainAccess(serviceUserId, domainId);
+    log.info("DB call userRepository.findByIdAndDomainId userId={} domainId={} source=get", userId, domainId);
     User user = userRepository.findByIdAndDomainId(userId, domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     return toResponse(user);
@@ -72,6 +78,7 @@ public class UserService {
 
   public List<UserResponse> search(Long serviceUserId, Long domainId, UserSearchRequest request) {
     accessService.requireDomainAccess(serviceUserId, domainId);
+    log.info("DB call domainRepository.existsById domainId={} source=search", domainId);
     if (!domainRepository.existsById(domainId)) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found");
     }
@@ -79,6 +86,7 @@ public class UserService {
         ? List.of()
         : request.filters();
 
+    log.info("DB call profileFieldRepository.findByDomainId domainId={} source=search", domainId);
     Map<Long, ProfileField> fieldById = toFieldMap(profileFieldRepository.findByDomainId(domainId));
     List<UserSearchFilter> resolvedFilters = new ArrayList<>();
 
@@ -93,6 +101,10 @@ public class UserService {
       resolvedFilters.add(toSearchFilter(field, filter));
     }
 
+    log.info(
+        "DB call userRepository.searchByDomainAndFilters domainId={} filtersCount={} source=search",
+        domainId,
+        resolvedFilters.size());
     List<User> users = userRepository.searchByDomainAndFilters(domainId, resolvedFilters);
     return users.stream()
         .map(this::toResponse)
@@ -101,30 +113,42 @@ public class UserService {
 
   public UserResponse update(Long serviceUserId, Long domainId, Long userId, UserUpdateRequest request) {
     accessService.requireDomainAccess(serviceUserId, domainId);
+    log.info("DB call userRepository.findByIdAndDomainId userId={} domainId={} source=update", userId, domainId);
     User user = userRepository.findByIdAndDomainId(userId, domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     return updateInternal(user, domainId, request, true);
   }
 
   public UserResponse updateByDomain(Long domainId, Long userId, UserUpdateRequest request) {
+    log.info(
+        "DB call userRepository.findByIdAndDomainId userId={} domainId={} source=updateByDomain",
+        userId,
+        domainId);
     User user = userRepository.findByIdAndDomainId(userId, domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     return updateInternal(user, domainId, request, false);
   }
 
-  @org.springframework.transaction.annotation.Transactional
+  @Transactional
   public void delete(Long serviceUserId, Long domainId, Long userId) {
     accessService.requireDomainAccess(serviceUserId, domainId);
+    log.info("DB call userRepository.findByIdAndDomainId userId={} domainId={} source=delete", userId, domainId);
     User user = userRepository.findByIdAndDomainId(userId, domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     userOtpService.clearAllCodes(user);
+    log.info("DB call userProfileValueRepository.deleteByUserId userId={} source=delete", user.getId());
     userProfileValueRepository.deleteByUserId(user.getId());
+    log.info("DB call userRepository.delete userId={} domainId={} source=delete", user.getId(), domainId);
     userRepository.delete(user);
   }
 
-  @org.springframework.transaction.annotation.Transactional
+  @Transactional
   private UserResponse registerInternal(Domain domain, UserRegistrationRequest request) {
     Long domainId = domain.getId();
+    log.info(
+        "DB call userRepository.existsByDomainIdAndEmail domainId={} email={} source=registerInternal",
+        domainId,
+        request.email());
     if (userRepository.existsByDomainIdAndEmail(domainId, request.email())) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists in domain");
     }
@@ -137,7 +161,16 @@ public class UserService {
         .build();
 
     applyProfileValues(user, domainId, request.values());
+    log.info(
+        "DB call userRepository.save domainId={} email={} source=registerInternal",
+        domainId,
+        user.getEmail());
     User saved = userRepository.save(user);
+    log.info(
+        "DB result userRepository.save userId={} domainId={} email={} source=registerInternal",
+        saved.getId(),
+        domainId,
+        saved.getEmail());
     String otpCode = userOtpService.createVerificationCode(saved);
     emailService.sendOtpEmail(domain, saved.getEmail(), otpCode);
     return toResponse(saved);
@@ -153,6 +186,10 @@ public class UserService {
       user.setPasswordHash(passwordEncoder.encode(request.password()));
     }
     if (request.email() != null && !request.email().isBlank()) {
+      log.info(
+          "DB call userRepository.existsByDomainIdAndEmail domainId={} email={} source=updateInternal",
+          domainId,
+          request.email());
       if (!request.email().equals(user.getEmail())
           && userRepository.existsByDomainIdAndEmail(domainId, request.email())) {
         throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists in domain");
@@ -182,7 +219,17 @@ public class UserService {
       otpCode = userOtpService.createVerificationCode(user);
     }
 
+    log.info(
+        "DB call userRepository.save userId={} domainId={} email={} source=updateInternal",
+        user.getId(),
+        domainId,
+        user.getEmail());
     User saved = userRepository.save(user);
+    log.info(
+        "DB result userRepository.save userId={} domainId={} email={} source=updateInternal",
+        saved.getId(),
+        domainId,
+        saved.getEmail());
     if (otpCode != null) {
       emailService.sendOtpEmail(user.getDomain(), saved.getEmail(), otpCode);
     }
@@ -198,6 +245,7 @@ public class UserService {
   }
 
   void applyProfileValues(User user, Long domainId, List<UserProfileValueRequest> requests) {
+    log.info("DB call profileFieldRepository.findByDomainId domainId={} source=applyProfileValues", domainId);
     List<ProfileField> fields = profileFieldRepository.findByDomainId(domainId);
     Map<Long, ProfileField> fieldById = toFieldMap(fields);
     List<UserProfileValueRequest> valueRequests = requests == null ? List.of() : requests;
@@ -205,7 +253,7 @@ public class UserService {
     Set<UserProfileValue> userValues = user.getValues();
     List<UserProfileValue> existingValues = user.getId() == null
         ? List.of()
-        : userProfileValueRepository.findByUserId(user.getId());
+        : loadUserValuesForUpdate(user.getId());
     for (UserProfileValue existing : existingValues) {
       userValues.add(existing);
     }
@@ -270,6 +318,11 @@ public class UserService {
     }
 
     user.setProfileJsonb(serializeProfile(new ArrayList<>(valueByFieldId.values())));
+  }
+
+  private List<UserProfileValue> loadUserValuesForUpdate(Long userId) {
+    log.info("DB call userProfileValueRepository.findByUserId userId={} source=applyProfileValues", userId);
+    return userProfileValueRepository.findByUserId(userId);
   }
 
   private void applyValue(UserProfileValue value, FieldType type, UserProfileValueRequest request) {
