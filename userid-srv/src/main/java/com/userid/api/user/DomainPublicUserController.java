@@ -1,9 +1,12 @@
 package com.userid.api.user;
 
 import com.userid.api.common.ApiMessage;
+import com.userid.api.client.AuthServerSocialLoginRequest;
+import com.userid.api.client.AuthServerSocialProvider;
 import com.userid.api.client.UseridApiEndpoints;
 import com.userid.security.DomainApiPrincipal;
 import com.userid.service.DomainUserAuthService;
+import com.userid.service.DomainUserSocialAuthService;
 import com.userid.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +25,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class DomainPublicUserController {
   private final UserService userService;
   private final DomainUserAuthService domainUserAuthService;
+  private final DomainUserSocialAuthService domainUserSocialAuthService;
 
   @PostMapping
   public UserResponse register(
@@ -41,6 +45,20 @@ public class DomainPublicUserController {
   ) {
     requireDomain(principal, domainId);
     return domainUserAuthService.login(domainId, request);
+  }
+
+  @PostMapping(UseridApiEndpoints.SOCIAL_LOGIN)
+  public UserLoginResponse socialLogin(
+      @AuthenticationPrincipal DomainApiPrincipal principal,
+      @PathVariable Long domainId,
+      @PathVariable String provider,
+      @RequestBody AuthServerSocialLoginRequest request
+  ) {
+    requireDomain(principal, domainId);
+    return domainUserSocialAuthService.login(
+        domainId,
+        parseProvider(provider),
+        request);
   }
 
   @PostMapping(UseridApiEndpoints.CONFIRM)
@@ -86,6 +104,14 @@ public class DomainPublicUserController {
   private void requireDomain(DomainApiPrincipal principal, Long domainId) {
     if (principal == null || !domainId.equals(principal.domainId())) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Domain mismatch");
+    }
+  }
+
+  private AuthServerSocialProvider parseProvider(String provider) {
+    try {
+      return AuthServerSocialProvider.fromPath(provider);
+    } catch (IllegalArgumentException ex) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
   }
 }

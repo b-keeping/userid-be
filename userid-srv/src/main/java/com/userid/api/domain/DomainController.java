@@ -1,14 +1,20 @@
 package com.userid.api.domain;
 
 import com.userid.api.common.ApiMessage;
+import com.userid.api.client.AuthServerSocialProvider;
+import com.userid.api.client.DomainSocialProviderConfigRequest;
+import com.userid.api.client.DomainSocialProviderConfigResponse;
+import com.userid.api.client.UseridApiEndpoints;
 import com.userid.api.domain.DomainApiTokenRequest;
 import com.userid.api.domain.DomainApiTokenResponse;
 import com.userid.api.domain.DomainJwtSecretResponse;
 import com.userid.security.AuthPrincipal;
 import com.userid.service.DomainService;
+import com.userid.service.DomainSocialProviderConfigService;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,12 +24,14 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
-@RequestMapping("/api/domains")
+@RequestMapping(UseridApiEndpoints.DOMAINS_BASE)
 @RequiredArgsConstructor
 public class DomainController {
   private final DomainService domainService;
+  private final DomainSocialProviderConfigService domainSocialProviderConfigService;
 
   @PostMapping
   public DomainResponse create(
@@ -99,6 +107,32 @@ public class DomainController {
     return domainService.generateDomainApiToken(principal.id(), domainId, expiresSeconds);
   }
 
+  @GetMapping(UseridApiEndpoints.DOMAIN_SOCIAL_PROVIDER_CONFIG)
+  public DomainSocialProviderConfigResponse getSocialProviderConfig(
+      @AuthenticationPrincipal AuthPrincipal principal,
+      @PathVariable Long domainId,
+      @PathVariable String provider
+  ) {
+    return domainSocialProviderConfigService.get(
+        principal.id(),
+        domainId,
+        parseProvider(provider));
+  }
+
+  @PutMapping(UseridApiEndpoints.DOMAIN_SOCIAL_PROVIDER_CONFIG)
+  public DomainSocialProviderConfigResponse updateSocialProviderConfig(
+      @AuthenticationPrincipal AuthPrincipal principal,
+      @PathVariable Long domainId,
+      @PathVariable String provider,
+      @RequestBody DomainSocialProviderConfigRequest request
+  ) {
+    return domainSocialProviderConfigService.upsert(
+        principal.id(),
+        domainId,
+        parseProvider(provider),
+        request);
+  }
+
   @DeleteMapping("/{domainId}")
   public ApiMessage delete(
       @AuthenticationPrincipal AuthPrincipal principal,
@@ -106,5 +140,13 @@ public class DomainController {
   ) {
     domainService.delete(principal.id(), domainId);
     return new ApiMessage("ok");
+  }
+
+  private AuthServerSocialProvider parseProvider(String provider) {
+    try {
+      return AuthServerSocialProvider.fromPath(provider);
+    } catch (IllegalArgumentException ex) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
   }
 }
