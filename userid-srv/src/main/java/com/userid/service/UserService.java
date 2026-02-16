@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -169,6 +170,15 @@ public class UserService {
             "DB duplicate user registration domainId={} emailPending={}",
             domainId,
             user.getEmailPending());
+        Optional<User> existingUser = findByDomainAndEmailOrPending(domainId, email);
+        if (existingUser.isPresent() && existingUser.get().getEmailVerifiedAt() == null) {
+          log.info(
+              "DB duplicate user registration resolved via unconfirmed user update domainId={} userId={} email={}",
+              domainId,
+              existingUser.get().getId(),
+              email);
+          return refreshUnconfirmedRegistration(existingUser.get(), domain, request);
+        }
         throw new ResponseStatusException(HttpStatus.CONFLICT, "User already registered");
       }
       throw ex;
@@ -182,6 +192,46 @@ public class UserService {
     String otpCode = userOtpService.createVerificationCode(saved);
     emailService.sendOtpEmail(domain, resolveVerificationEmail(saved), otpCode);
     return toResponse(saved);
+  }
+
+  private UserResponse refreshUnconfirmedRegistration(User user, Domain domain, UserRegistrationRequest request) {
+    Long domainId = domain.getId();
+    String email = request.email() == null ? null : request.email().trim();
+    user.setEmail(email);
+    user.setEmailPending(email);
+    user.setEmailVerifiedAt(null);
+    user.setPasswordHash(passwordEncoder.encode(requirePassword(request.password())));
+    applyProfileValues(user, domainId, request.values());
+
+    log.info(
+        "DB call userRepository.saveAndFlush userId={} domainId={} email={} emailPending={} source=refreshUnconfirmedRegistration",
+        user.getId(),
+        domainId,
+        user.getEmail(),
+        user.getEmailPending());
+    User saved;
+    try {
+      saved = userRepository.saveAndFlush(user);
+    } catch (DataIntegrityViolationException ex) {
+      if (isDuplicateUserEmailViolation(ex)) {
+        log.warn(
+            "DB duplicate user registration refresh userId={} domainId={} email={} emailPending={}",
+            user.getId(),
+            domainId,
+            user.getEmail(),
+            user.getEmailPending());
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "User already registered");
+      }
+      throw ex;
+    }
+    String otpCode = userOtpService.reuseVerificationCode(saved);
+    emailService.sendOtpEmail(domain, resolveVerificationEmail(saved), otpCode);
+    return toResponse(saved);
+  }
+
+  private Optional<User> findByDomainAndEmailOrPending(Long domainId, String email) {
+    return userRepository.findByDomainIdAndEmail(domainId, email)
+        .or(() -> userRepository.findByDomainIdAndEmailPending(domainId, email));
   }
 
   private UserResponse updateInternal(User user, Long domainId, UserUpdateRequest request, boolean allowConfirmed) {

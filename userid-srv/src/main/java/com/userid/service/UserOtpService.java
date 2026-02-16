@@ -32,6 +32,23 @@ public class UserOtpService {
     return createCode(user, OtpType.VERIFICATION, verificationHours);
   }
 
+  public String reuseVerificationCode(User user) {
+    if (user.getId() == null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User must be saved before OTP");
+    }
+    OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+    return otpUserRepository.findTopByUserIdAndTypeOrderByCreatedAtDesc(user.getId(), OtpType.VERIFICATION)
+        .map(otp -> {
+          if (now.isAfter(otp.getExpiresAt())) {
+            otp.setCreatedAt(now);
+            otp.setExpiresAt(now.plusHours(verificationHours));
+            otpUserRepository.save(otp);
+          }
+          return otp.getCode();
+        })
+        .orElseGet(() -> createVerificationCode(user));
+  }
+
   public String createResetCode(User user) {
     return createCode(user, OtpType.RESET, resetHours);
   }

@@ -19,10 +19,10 @@ public class UseridApiMessageResolver {
         "User with this email is not registered, or email is not confirmed, or email/password do not match.");
   }
 
-  public String registerDuplicateEmailMessage() {
+  public String registerConfirmationSentMessage() {
     return getMessage(
-        "auth.register.duplicate_email",
-        "User with this email is already registered.");
+        "auth.register.confirmation_sent",
+        "A confirmation email with instructions has been sent to your email address.");
   }
 
   private String getMessage(String key, String fallback) {

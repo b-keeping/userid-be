@@ -146,7 +146,7 @@ class AuthServerApiClientTests {
   }
 
   @Test
-  void registerConflictReturnsLocalizedMessage() {
+  void registerConflictPropagatesServerMessage() {
     server.expect(requestTo("https://auth.example.org/api/external/domains/55/users"))
         .andExpect(method(HttpMethod.POST))
         .andRespond(withStatus(HttpStatus.CONFLICT)
@@ -155,7 +155,7 @@ class AuthServerApiClientTests {
 
     assertThatThrownBy(() -> authServerApiClient.register(registerRequest()))
         .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("Пользователь с таким email уже зарегистрирован");
+        .hasMessageContaining("User already registered");
   }
 
   @Test
@@ -178,7 +178,7 @@ class AuthServerApiClientTests {
     assertThatThrownBy(() -> authServerApiClient.login(new AuthServerLoginRequest("user@example.org", "bad")))
         .isInstanceOf(ResponseStatusException.class)
         .hasMessageContaining(
-            "Пользователь с таким email  не зарегистрирован или email не подтвержден или email/пароль не совппадают");
+            "Пользователь с таким email  не зарегистрирован или email не подтвержден или email/пароль не совпадают");
   }
 
   private AuthServerRegisterRequest registerRequest() {
