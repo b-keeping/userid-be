@@ -8,6 +8,7 @@ public final class UseridApiEndpoints {
 
   public static final String LOGIN = "/login";
   public static final String SOCIAL_LOGIN = LOGIN + "/{provider}";
+  public static final String SOCIAL_PROVIDER_CONFIG = "/social/{provider}/config";
   public static final String CONFIRM = "/confirm";
   public static final String FORGOT_PASSWORD = "/forgot-password";
   public static final String RESET_PASSWORD = "/reset-password";
@@ -38,6 +39,13 @@ public final class UseridApiEndpoints {
         + LOGIN
         + "/"
         + provider.pathValue();
+  }
+
+  public static String externalDomainUsersSocialProviderConfig(Long domainId, AuthServerSocialProvider provider) {
+    return externalDomainUsers(domainId)
+        + "/social/"
+        + provider.pathValue()
+        + "/config";
   }
 
   public static String externalDomainUsersMe(Long domainId) {

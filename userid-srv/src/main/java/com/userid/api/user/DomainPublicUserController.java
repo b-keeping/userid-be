@@ -3,8 +3,10 @@ package com.userid.api.user;
 import com.userid.api.common.ApiMessage;
 import com.userid.api.client.AuthServerSocialLoginRequest;
 import com.userid.api.client.AuthServerSocialProvider;
+import com.userid.api.client.DomainSocialProviderConfigResponse;
 import com.userid.api.client.UseridApiEndpoints;
 import com.userid.security.DomainApiPrincipal;
+import com.userid.service.DomainSocialProviderConfigService;
 import com.userid.service.DomainUserAuthService;
 import com.userid.service.DomainUserSocialAuthService;
 import com.userid.service.UserService;
@@ -12,6 +14,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -26,6 +29,7 @@ public class DomainPublicUserController {
   private final UserService userService;
   private final DomainUserAuthService domainUserAuthService;
   private final DomainUserSocialAuthService domainUserSocialAuthService;
+  private final DomainSocialProviderConfigService domainSocialProviderConfigService;
 
   @PostMapping
   public UserResponse register(
@@ -59,6 +63,18 @@ public class DomainPublicUserController {
         domainId,
         parseProvider(provider),
         request);
+  }
+
+  @GetMapping(UseridApiEndpoints.SOCIAL_PROVIDER_CONFIG)
+  public DomainSocialProviderConfigResponse socialProviderConfig(
+      @AuthenticationPrincipal DomainApiPrincipal principal,
+      @PathVariable Long domainId,
+      @PathVariable String provider
+  ) {
+    requireDomain(principal, domainId);
+    return domainSocialProviderConfigService.getForDomainApi(
+        domainId,
+        parseProvider(provider));
   }
 
   @PostMapping(UseridApiEndpoints.CONFIRM)

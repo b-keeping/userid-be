@@ -235,6 +235,66 @@ public class AuthServerApiClient {
     }
   }
 
+  public DomainSocialProviderConfigResponse getSocialProviderConfig(AuthServerSocialProvider provider) {
+    if (!properties.isEnabled()) {
+      return new DomainSocialProviderConfigResponse(
+          provider == null ? null : provider.pathValue(),
+          false,
+          null,
+          false,
+          null);
+    }
+
+    requireConfigured();
+    if (provider == null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Social provider is required");
+    }
+
+    String endpoint = "%s%s".formatted(
+        normalizeBaseUrl(properties.getBaseUrl()),
+        UseridApiEndpoints.externalDomainUsersSocialProviderConfig(properties.getDomainId(), provider));
+    log.info(
+        "Auth server social-config start url={} domainId={} provider={}",
+        endpoint,
+        properties.getDomainId(),
+        provider.pathValue());
+
+    try {
+      DomainSocialProviderConfigResponse response = restTemplate.exchange(
+              endpoint,
+              HttpMethod.GET,
+              new HttpEntity<>(requestHeaders()),
+              DomainSocialProviderConfigResponse.class)
+          .getBody();
+      if (response == null) {
+        return new DomainSocialProviderConfigResponse(provider.pathValue(), false, null, false, null);
+      }
+      log.info(
+          "Auth server social-config success domainId={} provider={} enabled={} callbackUri={}",
+          properties.getDomainId(),
+          provider.pathValue(),
+          response.enabled(),
+          response.callbackUri());
+      return response;
+    } catch (HttpStatusCodeException ex) {
+      ResponseStatusException mapped = mapStatusException(ex, "Social provider config failed on auth server");
+      log.warn(
+          "Auth server social-config failed domainId={} provider={} status={} message={}",
+          properties.getDomainId(),
+          provider.pathValue(),
+          ex.getStatusCode(),
+          mapped.getReason());
+      throw mapped;
+    } catch (ResourceAccessException ex) {
+      log.warn(
+          "Auth server social-config failed domainId={} provider={} reason={}",
+          properties.getDomainId(),
+          provider.pathValue(),
+          ex.getMessage());
+      throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Registration server is unavailable");
+    }
+  }
+
   public void forgotPassword(AuthServerForgotPasswordRequest request) {
     if (!properties.isEnabled()) {
       return;

@@ -42,6 +42,25 @@ public class DomainSocialProviderConfigService {
     return toResponse(config);
   }
 
+  public DomainSocialProviderConfigResponse getForDomainApi(
+      Long domainId,
+      AuthServerSocialProvider provider
+  ) {
+    DomainSocialProviderConfig config = domainSocialProviderConfigRepository
+        .findByDomainIdAndProvider(domainId, provider)
+        .orElse(null);
+    if (config == null || !Boolean.TRUE.equals(config.getEnabled())) {
+      return new DomainSocialProviderConfigResponse(
+          provider.pathValue(),
+          false,
+          null,
+          false,
+          null
+      );
+    }
+    return toResponse(config);
+  }
+
   public DomainSocialProviderConfigResponse upsert(
       Long ownerId,
       Long domainId,
