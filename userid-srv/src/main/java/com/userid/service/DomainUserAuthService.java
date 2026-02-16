@@ -77,9 +77,12 @@ public class DomainUserAuthService {
 
   public ApiMessage forgotPassword(Long domainId, UserForgotPasswordRequest request) {
     User user = userRepository.findByDomainIdAndEmail(domainId, request.email())
+        .or(() -> userRepository.findByDomainIdAndEmailPending(domainId, request.email()))
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     if (user.getEmailVerifiedAt() == null) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is not confirmed");
+      String verificationCode = userOtpService.createVerificationCode(user);
+      emailService.sendOtpEmail(user.getDomain(), resolveVerificationEmail(user), verificationCode);
+      return new ApiMessage("ok");
     }
     String code = userOtpService.createResetCode(user);
     userRepository.save(user);

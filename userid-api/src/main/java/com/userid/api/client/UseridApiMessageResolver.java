@@ -25,6 +25,12 @@ public class UseridApiMessageResolver {
         "A confirmation email with instructions has been sent to your email address.");
   }
 
+  public String forgotPasswordIfRegisteredMessage() {
+    return getMessage(
+        "auth.forgot_password.if_registered",
+        "If the specified email is registered, an email with instructions will be sent.");
+  }
+
   private String getMessage(String key, String fallback) {
     UseridApiLanguage language = properties.getLanguage();
     Locale locale = language == null ? Locale.ENGLISH : language.toLocale();

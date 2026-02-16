@@ -2,11 +2,13 @@ package com.userid.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.userid.api.common.ApiMessage;
 import com.userid.api.user.UserConfirmRequest;
+import com.userid.api.user.UserForgotPasswordRequest;
 import com.userid.dal.entity.Domain;
 import com.userid.dal.entity.OtpType;
 import com.userid.dal.entity.OtpUser;
@@ -84,5 +86,52 @@ class DomainUserAuthServiceTests {
     assertThatThrownBy(() -> domainUserAuthService.confirm(99L, new UserConfirmRequest("abc123")))
         .isInstanceOf(ResponseStatusException.class)
         .hasMessageContaining(HttpStatus.FORBIDDEN.toString());
+  }
+
+  @Test
+  void forgotPasswordWhenEmailNotConfirmedResendsVerificationAndReturnsOk() {
+    Domain domain = Domain.builder().id(7L).name("example.org").build();
+    User user = User.builder()
+        .domain(domain)
+        .email("user@example.org")
+        .emailPending("user@example.org")
+        .passwordHash("hash")
+        .createdAt(OffsetDateTime.now())
+        .emailVerifiedAt(null)
+        .build();
+    when(userRepository.findByDomainIdAndEmail(7L, "user@example.org")).thenReturn(java.util.Optional.of(user));
+    when(userOtpService.createVerificationCode(user)).thenReturn("verify-code");
+
+    ApiMessage response = domainUserAuthService.forgotPassword(7L, new UserForgotPasswordRequest("user@example.org"));
+
+    assertThat(response.message()).isEqualTo("ok");
+    verify(userOtpService).createVerificationCode(user);
+    verify(emailService).sendOtpEmail(domain, "user@example.org", "verify-code");
+    verify(userOtpService, never()).createResetCode(user);
+    verify(emailService, never()).sendUserPasswordResetCode(domain, "user@example.org", "verify-code");
+    verify(userRepository, never()).save(user);
+  }
+
+  @Test
+  void forgotPasswordWhenEmailConfirmedSendsResetCode() {
+    Domain domain = Domain.builder().id(7L).name("example.org").build();
+    User user = User.builder()
+        .domain(domain)
+        .email("user@example.org")
+        .emailPending("user@example.org")
+        .passwordHash("hash")
+        .createdAt(OffsetDateTime.now())
+        .emailVerifiedAt(OffsetDateTime.now())
+        .build();
+    when(userRepository.findByDomainIdAndEmail(7L, "user@example.org")).thenReturn(java.util.Optional.of(user));
+    when(userOtpService.createResetCode(user)).thenReturn("reset-code");
+
+    ApiMessage response = domainUserAuthService.forgotPassword(7L, new UserForgotPasswordRequest("user@example.org"));
+
+    assertThat(response.message()).isEqualTo("ok");
+    verify(userOtpService).createResetCode(user);
+    verify(userRepository).save(user);
+    verify(emailService).sendUserPasswordResetCode(domain, "user@example.org", "reset-code");
+    verify(userOtpService, never()).createVerificationCode(user);
   }
 }
