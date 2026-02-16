@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -23,7 +22,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
@@ -64,7 +62,7 @@ class UserServiceTests {
   }
 
   @Test
-  void registerByDomainDuplicateKeyReturnsConflictUserAlreadyRegisteredWhenExistingUserIsConfirmed() {
+  void registerByDomainReturnsConflictWhenExistingUserIsConfirmed() {
     Domain domain = Domain.builder().id(12L).name("example.org").build();
     UserRegistrationRequest request = new UserRegistrationRequest("user@example.org", "secret", List.of());
     User existingConfirmed = User.builder()
@@ -78,11 +76,6 @@ class UserServiceTests {
         .build();
 
     when(domainRepository.findById(12L)).thenReturn(Optional.of(domain));
-    when(profileFieldRepository.findByDomainId(12L)).thenReturn(List.of());
-    when(passwordEncoder.encode("secret")).thenReturn("hash");
-    when(userRepository.saveAndFlush(any(User.class)))
-        .thenThrow(new DataIntegrityViolationException(
-            "duplicate key value violates unique constraint \"uk_users_domain_email_pending\""));
     when(userRepository.findByDomainIdAndEmail(12L, "user@example.org")).thenReturn(Optional.of(existingConfirmed));
 
     assertThatThrownBy(() -> userService.registerByDomain(12L, request))
@@ -90,13 +83,14 @@ class UserServiceTests {
         .hasMessageContaining(HttpStatus.CONFLICT.toString())
         .hasMessageContaining("User already registered");
 
+    verify(userRepository, never()).saveAndFlush(any(User.class));
     verify(userOtpService, never()).createVerificationCode(any(User.class));
     verify(userOtpService, never()).reuseVerificationCode(any(User.class));
     verify(emailService, never()).sendOtpEmail(any(), any(), any());
   }
 
   @Test
-  void registerByDomainDuplicateKeyUpdatesUnconfirmedUserAndResendsExistingOtp() {
+  void registerByDomainUpdatesUnconfirmedUserAndResendsExistingOtp() {
     Domain domain = Domain.builder().id(12L).name("example.org").build();
     UserRegistrationRequest request = new UserRegistrationRequest("user@example.org", "secret", List.of());
     User existingUnconfirmed = User.builder()
@@ -112,16 +106,12 @@ class UserServiceTests {
     when(domainRepository.findById(12L)).thenReturn(Optional.of(domain));
     when(profileFieldRepository.findByDomainId(12L)).thenReturn(List.of());
     when(passwordEncoder.encode("secret")).thenReturn("hash");
-    when(userRepository.saveAndFlush(any(User.class)))
-        .thenThrow(new DataIntegrityViolationException(
-            "duplicate key value violates unique constraint \"uk_users_domain_email_pending\""))
-        .thenReturn(existingUnconfirmed);
     when(userRepository.findByDomainIdAndEmail(12L, "user@example.org")).thenReturn(Optional.of(existingUnconfirmed));
+    when(userRepository.saveAndFlush(existingUnconfirmed)).thenReturn(existingUnconfirmed);
     when(userOtpService.reuseVerificationCode(existingUnconfirmed)).thenReturn("otp-existing");
 
     userService.registerByDomain(12L, request);
 
-    verify(userRepository, times(2)).saveAndFlush(any(User.class));
     verify(userRepository).saveAndFlush(existingUnconfirmed);
     verify(userOtpService, never()).createVerificationCode(any(User.class));
     verify(userOtpService).reuseVerificationCode(existingUnconfirmed);

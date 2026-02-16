@@ -148,6 +148,21 @@ public class UserService {
   private UserResponse registerInternal(Domain domain, UserRegistrationRequest request) {
     Long domainId = domain.getId();
     String email = request.email() == null ? null : request.email().trim();
+    Optional<User> existingUser = findByDomainAndEmailOrPending(domainId, email);
+    if (existingUser.isPresent()) {
+      User existing = existingUser.get();
+      if (existing.getEmailVerifiedAt() != null) {
+        log.warn("DB duplicate user registration domainId={} emailPending={}", domainId, email);
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "User already registered");
+      }
+      log.info(
+          "DB duplicate user registration resolved via unconfirmed user update domainId={} userId={} email={}",
+          domainId,
+          existing.getId(),
+          email);
+      return refreshUnconfirmedRegistration(existing, domain, request);
+    }
+
     User user = User.builder()
         .domain(domain)
         .email(email)
@@ -166,19 +181,7 @@ public class UserService {
       saved = userRepository.saveAndFlush(user);
     } catch (DataIntegrityViolationException ex) {
       if (isDuplicateUserEmailViolation(ex)) {
-        log.warn(
-            "DB duplicate user registration domainId={} emailPending={}",
-            domainId,
-            user.getEmailPending());
-        Optional<User> existingUser = findByDomainAndEmailOrPending(domainId, email);
-        if (existingUser.isPresent() && existingUser.get().getEmailVerifiedAt() == null) {
-          log.info(
-              "DB duplicate user registration resolved via unconfirmed user update domainId={} userId={} email={}",
-              domainId,
-              existingUser.get().getId(),
-              email);
-          return refreshUnconfirmedRegistration(existingUser.get(), domain, request);
-        }
+        log.warn("DB duplicate user registration domainId={} emailPending={}", domainId, user.getEmailPending());
         throw new ResponseStatusException(HttpStatus.CONFLICT, "User already registered");
       }
       throw ex;
