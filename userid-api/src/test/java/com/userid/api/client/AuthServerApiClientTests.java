@@ -146,6 +146,19 @@ class AuthServerApiClientTests {
   }
 
   @Test
+  void registerConflictReturnsLocalizedMessage() {
+    server.expect(requestTo("https://auth.example.org/api/external/domains/55/users"))
+        .andExpect(method(HttpMethod.POST))
+        .andRespond(withStatus(HttpStatus.CONFLICT)
+            .contentType(MediaType.APPLICATION_JSON)
+            .body("{\"message\":\"User already registered\"}"));
+
+    assertThatThrownBy(() -> authServerApiClient.register(registerRequest()))
+        .isInstanceOf(ResponseStatusException.class)
+        .hasMessageContaining("Пользователь с таким email уже зарегистрирован");
+  }
+
+  @Test
   void registerFailsWhenJwtTokenIsMissing() {
     properties.setApiToken("   ");
 

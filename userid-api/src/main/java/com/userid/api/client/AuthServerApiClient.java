@@ -61,6 +61,16 @@ public class AuthServerApiClient {
           properties.getDomainId(),
           request.email());
     } catch (HttpStatusCodeException ex) {
+      if (ex.getStatusCode().value() == HttpStatus.CONFLICT.value()) {
+        String localizedMessage = messageResolver.registerDuplicateEmailMessage();
+        log.warn(
+            "Auth server register failed domainId={} email={} status={} message={}",
+            properties.getDomainId(),
+            request.email(),
+            ex.getStatusCode(),
+            localizedMessage);
+        throw new ResponseStatusException(HttpStatus.CONFLICT, localizedMessage);
+      }
       ResponseStatusException mapped = mapStatusException(ex, "Registration failed on auth server");
       log.warn(
           "Auth server register failed domainId={} email={} status={} message={}",

@@ -19,6 +19,12 @@ public class UseridApiMessageResolver {
         "User with this email is not registered, or email is not confirmed, or email/password do not match.");
   }
 
+  public String registerDuplicateEmailMessage() {
+    return getMessage(
+        "auth.register.duplicate_email",
+        "User with this email is already registered.");
+  }
+
   private String getMessage(String key, String fallback) {
     UseridApiLanguage language = properties.getLanguage();
     Locale locale = language == null ? Locale.ENGLISH : language.toLocale();
