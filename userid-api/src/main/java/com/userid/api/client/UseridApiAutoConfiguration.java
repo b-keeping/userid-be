@@ -15,7 +15,8 @@ public class UseridApiAutoConfiguration {
   @ConditionalOnMissingBean
   public AuthServerApiClient authServerApiClient(
       RestTemplate restTemplate,
-      AuthServerApiProperties properties
+      AuthServerApiProperties properties,
+      UseridApiMessageResolver messageResolver
   ) {
     ObjectMapper objectMapper = restTemplate.getMessageConverters().stream()
         .filter(MappingJackson2HttpMessageConverter.class::isInstance)
@@ -23,7 +24,13 @@ public class UseridApiAutoConfiguration {
         .map(MappingJackson2HttpMessageConverter::getObjectMapper)
         .findFirst()
         .orElseGet(() -> new ObjectMapper().findAndRegisterModules());
-    return new AuthServerApiClient(restTemplate, properties, objectMapper);
+    return new AuthServerApiClient(restTemplate, properties, objectMapper, messageResolver);
+  }
+
+  @Bean
+  @ConditionalOnMissingBean
+  public UseridApiMessageResolver useridApiMessageResolver(AuthServerApiProperties properties) {
+    return new UseridApiMessageResolver(properties);
   }
 
   @Bean

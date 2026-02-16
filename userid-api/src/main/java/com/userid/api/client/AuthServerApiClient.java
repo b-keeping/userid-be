@@ -26,6 +26,7 @@ public class AuthServerApiClient {
   private final RestTemplate restTemplate;
   private final AuthServerApiProperties properties;
   private final ObjectMapper objectMapper;
+  private final UseridApiMessageResolver messageResolver;
 
   public boolean isEnabled() {
     return properties.isEnabled();
@@ -149,6 +150,16 @@ public class AuthServerApiClient {
           response != null && StringUtils.hasText(response.token()));
       return response;
     } catch (HttpStatusCodeException ex) {
+      if (ex.getStatusCode().value() == HttpStatus.UNAUTHORIZED.value()) {
+        String localizedMessage = messageResolver.loginUnauthorizedMessage();
+        log.warn(
+            "Auth server login failed domainId={} email={} status={} message={}",
+            properties.getDomainId(),
+            request.email(),
+            ex.getStatusCode(),
+            localizedMessage);
+        throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, localizedMessage);
+      }
       ResponseStatusException mapped = mapStatusException(ex, "Login failed on auth server");
       log.warn(
           "Auth server login failed domainId={} email={} status={} message={}",

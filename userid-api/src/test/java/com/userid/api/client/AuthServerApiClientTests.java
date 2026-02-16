@@ -7,6 +7,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withBadRequest;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
@@ -35,8 +37,13 @@ class AuthServerApiClientTests {
     properties.setBaseUrl("https://auth.example.org");
     properties.setDomainId(55L);
     properties.setApiToken("domain-token");
+    properties.setLanguage(UseridApiLanguage.RU);
     authServerApiClient =
-        new AuthServerApiClient(restTemplate, properties, new ObjectMapper().findAndRegisterModules());
+        new AuthServerApiClient(
+            restTemplate,
+            properties,
+            new ObjectMapper().findAndRegisterModules(),
+            new UseridApiMessageResolver(properties));
     server = MockRestServiceServer.bindTo(restTemplate).build();
   }
 
@@ -145,6 +152,20 @@ class AuthServerApiClientTests {
     assertThatThrownBy(() -> authServerApiClient.register(registerRequest()))
         .isInstanceOf(ResponseStatusException.class)
         .hasMessageContaining("Auth server is not configured");
+  }
+
+  @Test
+  void login401ReturnsLocalizedMessage() {
+    server.expect(requestTo("https://auth.example.org/api/external/domains/55/users/login"))
+        .andExpect(method(HttpMethod.POST))
+        .andRespond(withStatus(HttpStatus.UNAUTHORIZED)
+            .contentType(MediaType.APPLICATION_JSON)
+            .body("{\"message\":\"Invalid credentials\"}"));
+
+    assertThatThrownBy(() -> authServerApiClient.login(new AuthServerLoginRequest("user@example.org", "bad")))
+        .isInstanceOf(ResponseStatusException.class)
+        .hasMessageContaining(
+            "Пользователь с таким email  не зарегистрирован или email не подтвержден или email/пароль не совппадают");
   }
 
   private AuthServerRegisterRequest registerRequest() {
