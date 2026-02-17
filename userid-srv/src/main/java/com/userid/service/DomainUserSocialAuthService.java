@@ -29,6 +29,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -183,9 +184,19 @@ public class DomainUserSocialAuthService {
           .body(form)
           .retrieve()
           .body(YandexTokenResponse.class);
+    } catch (RestClientResponseException ex) {
+      String body = ex.getResponseBodyAsString();
+      if (body != null && body.toLowerCase().contains("invalid_client")) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Yandex social provider config is invalid");
+      }
+      throw new ResponseStatusException(
+          HttpStatus.UNAUTHORIZED,
+          "Invalid Yandex authorization code or redirect_uri mismatch");
     } catch (RestClientException ex) {
       log.warn("Yandex token exchange failed domainId={} reason={}", config.getDomain().getId(), ex.getMessage());
-      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid Yandex authorization code");
+      throw new ResponseStatusException(
+          HttpStatus.UNAUTHORIZED,
+          "Invalid Yandex authorization code or redirect_uri mismatch");
     }
 
     if (tokenResponse == null || !StringUtils.hasText(tokenResponse.accessToken())) {
