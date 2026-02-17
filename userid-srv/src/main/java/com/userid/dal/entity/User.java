@@ -68,6 +68,11 @@ public class User {
   private OffsetDateTime emailVerifiedAt;
 
   @Builder.Default
+  @Column(name = "active", nullable = false)
+  @ColumnDefault("true")
+  private boolean active = false;
+
+  @Builder.Default
   @Column(name = "profile_jsonb", nullable = false, columnDefinition = "jsonb")
   @JdbcTypeCode(SqlTypes.JSON)
   @ColumnDefault("'{}'::jsonb")

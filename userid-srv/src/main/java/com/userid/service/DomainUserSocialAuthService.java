@@ -23,7 +23,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
@@ -52,7 +51,6 @@ public class DomainUserSocialAuthService {
   private final DomainUserJwtService domainUserJwtService;
   private final RestClient restClient = RestClient.builder().build();
 
-  @Transactional
   public UserLoginResponse login(
       Long domainId,
       AuthServerSocialProvider provider,
@@ -87,7 +85,7 @@ public class DomainUserSocialAuthService {
     User user = identity == null
         ? resolveOrCreateUser(config.getDomain(), socialPrincipal)
         : identity.getUser();
-    boolean userChanged = syncUserEmailFromSocial(user, socialPrincipal);
+    boolean userChanged = syncUserFromSocial(user, socialPrincipal);
     if (userChanged) {
       user = saveUser(user);
     }
@@ -328,6 +326,7 @@ public class DomainUserSocialAuthService {
             .passwordHash(passwordEncoder.encode(UUID.randomUUID().toString()))
             .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
             .emailVerifiedAt(OffsetDateTime.now(ZoneOffset.UTC))
+            .active(true)
             .build()));
   }
 
@@ -339,7 +338,7 @@ public class DomainUserSocialAuthService {
     }
   }
 
-  private boolean syncUserEmailFromSocial(User user, SocialPrincipal socialPrincipal) {
+  private boolean syncUserFromSocial(User user, SocialPrincipal socialPrincipal) {
     boolean changed = false;
     if (!StringUtils.hasText(user.getEmailPending())) {
       user.setEmailPending(socialPrincipal.email());
@@ -349,10 +348,12 @@ public class DomainUserSocialAuthService {
       user.setEmail(socialPrincipal.email());
       changed = true;
     }
-    if (socialPrincipal.emailVerified() && user.getEmailVerifiedAt() == null) {
-      user.setEmailPending(socialPrincipal.email());
-      user.setEmail(socialPrincipal.email());
+    if (user.getEmailVerifiedAt() == null) {
       user.setEmailVerifiedAt(OffsetDateTime.now(ZoneOffset.UTC));
+      changed = true;
+    }
+    if (!user.isActive()) {
+      user.setActive(true);
       changed = true;
     }
     return changed;
@@ -385,6 +386,7 @@ public class DomainUserSocialAuthService {
         user.getDomain().getId(),
         user.getEmail(),
         user.getEmailVerifiedAt() != null,
+        user.isActive(),
         user.getCreatedAt());
   }
 

@@ -10,7 +10,6 @@ import com.userid.security.DomainApiPrincipal;
 import com.userid.service.DomainSocialProviderConfigService;
 import com.userid.service.DomainUserAuthService;
 import com.userid.service.DomainUserSocialAuthService;
-import com.userid.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -27,19 +26,18 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping(UseridApiEndpoints.EXTERNAL_DOMAIN_USERS_BASE)
 @RequiredArgsConstructor
 public class DomainPublicUserController {
-  private final UserService userService;
   private final DomainUserAuthService domainUserAuthService;
   private final DomainUserSocialAuthService domainUserSocialAuthService;
   private final DomainSocialProviderConfigService domainSocialProviderConfigService;
 
   @PostMapping
-  public UserResponse register(
+  public UserLoginResponse register(
       @AuthenticationPrincipal DomainApiPrincipal principal,
       @PathVariable Long domainId,
       @Valid @RequestBody UserRegistrationRequest request
   ) {
     requireDomain(principal, domainId);
-    return userService.registerByDomain(domainId, request);
+    return domainUserAuthService.register(domainId, request);
   }
 
   @PostMapping(UseridApiEndpoints.LOGIN)
@@ -81,7 +79,7 @@ public class DomainPublicUserController {
   }
 
   @PostMapping(UseridApiEndpoints.CONFIRM)
-  public ApiMessage confirm(
+  public UserLoginResponse confirm(
       @AuthenticationPrincipal DomainApiPrincipal principal,
       @PathVariable Long domainId,
       @Valid @RequestBody UserConfirmRequest request

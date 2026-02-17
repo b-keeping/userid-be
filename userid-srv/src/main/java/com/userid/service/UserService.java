@@ -151,12 +151,12 @@ public class UserService {
     Optional<User> existingUser = findByDomainAndEmailOrPending(domainId, email);
     if (existingUser.isPresent()) {
       User existing = existingUser.get();
-      if (existing.getEmailVerifiedAt() != null) {
+      if (existing.isActive()) {
         log.warn("DB duplicate user registration domainId={} emailPending={}", domainId, email);
         throw new ResponseStatusException(HttpStatus.CONFLICT, "User already registered");
       }
       log.info(
-          "DB duplicate user registration resolved via unconfirmed user update domainId={} userId={} email={}",
+          "DB duplicate user registration resolved via pending user update domainId={} userId={} email={}",
           domainId,
           existing.getId(),
           email);
@@ -169,6 +169,7 @@ public class UserService {
         .emailPending(email)
         .passwordHash(passwordEncoder.encode(requirePassword(request.password())))
         .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
+        .active(false)
         .build();
 
     applyProfileValues(user, domainId, request.values());
@@ -200,9 +201,14 @@ public class UserService {
   private UserResponse refreshUnconfirmedRegistration(User user, Domain domain, UserRegistrationRequest request) {
     Long domainId = domain.getId();
     String email = request.email() == null ? null : request.email().trim();
+    String currentEmail = resolveDisplayedEmail(user);
+    boolean emailChanged = currentEmail == null || !currentEmail.equals(email);
     user.setEmail(email);
     user.setEmailPending(email);
-    user.setEmailVerifiedAt(null);
+    if (emailChanged) {
+      user.setEmailVerifiedAt(null);
+    }
+    user.setActive(false);
     user.setPasswordHash(passwordEncoder.encode(requirePassword(request.password())));
     applyProfileValues(user, domainId, request.values());
 
@@ -227,8 +233,10 @@ public class UserService {
       }
       throw ex;
     }
-    String otpCode = userOtpService.reuseVerificationCode(saved);
-    emailService.sendOtpEmail(domain, resolveVerificationEmail(saved), otpCode);
+    if (saved.getEmailVerifiedAt() == null) {
+      String otpCode = userOtpService.reuseVerificationCode(saved);
+      emailService.sendOtpEmail(domain, resolveVerificationEmail(saved), otpCode);
+    }
     return toResponse(saved);
   }
 
@@ -261,6 +269,7 @@ public class UserService {
         user.setEmailVerifiedAt(OffsetDateTime.now(ZoneOffset.UTC));
       } else {
         user.setEmailVerifiedAt(null);
+        user.setActive(false);
         userOtpService.clearVerificationCode(user);
       }
     }
@@ -494,7 +503,13 @@ public class UserService {
     }
 
     boolean confirmed = user.getEmailVerifiedAt() != null;
-    return new UserResponse(user.getId(), resolveDisplayedEmail(user), confirmed, user.getCreatedAt(), values);
+    return new UserResponse(
+        user.getId(),
+        resolveDisplayedEmail(user),
+        confirmed,
+        user.isActive(),
+        user.getCreatedAt(),
+        values);
   }
 
   private String resolveDisplayedEmail(User user) {

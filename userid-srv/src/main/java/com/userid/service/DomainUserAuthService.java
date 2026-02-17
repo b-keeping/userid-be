@@ -6,6 +6,7 @@ import com.userid.api.user.UserConfirmRequest;
 import com.userid.api.user.UserForgotPasswordRequest;
 import com.userid.api.user.UserLoginRequest;
 import com.userid.api.user.UserLoginResponse;
+import com.userid.api.user.UserRegistrationRequest;
 import com.userid.api.user.UserResetPasswordRequest;
 import com.userid.api.user.UserResponse;
 import com.userid.api.user.UserSelfUpdateRequest;
@@ -37,6 +38,18 @@ public class DomainUserAuthService {
   private final EmailService emailService;
   private final UserService userService;
 
+  public UserLoginResponse register(Long domainId, UserRegistrationRequest request) {
+    try {
+      UserResponse user = userService.registerByDomain(domainId, request);
+      return new UserLoginResponse(null, toAuthResponse(domainId, user));
+    } catch (ResponseStatusException ex) {
+      if (ex.getStatusCode().value() != HttpStatus.CONFLICT.value()) {
+        throw ex;
+      }
+      return login(domainId, new UserLoginRequest(request.email(), request.password()));
+    }
+  }
+
   public UserLoginResponse login(Long domainId, UserLoginRequest request) {
     User user = userRepository.findByDomainIdAndEmail(domainId, request.email())
         .or(() -> userRepository.findByDomainIdAndEmailPending(domainId, request.email()))
@@ -44,6 +57,9 @@ public class DomainUserAuthService {
 
     if (user.getEmailVerifiedAt() == null) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Email is not confirmed");
+    }
+    if (!user.isActive()) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User is not active");
     }
     if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
       throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
@@ -54,7 +70,7 @@ public class DomainUserAuthService {
   }
 
   @Transactional
-  public ApiMessage confirm(Long domainId, UserConfirmRequest request) {
+  public UserLoginResponse confirm(Long domainId, UserConfirmRequest request) {
     OtpUser otp = userOtpService.requireValid(OtpType.VERIFICATION, request.code());
     User user = otp.getUser();
     if (!domainId.equals(user.getDomain().getId())) {
@@ -63,6 +79,7 @@ public class DomainUserAuthService {
     String pendingEmail = resolveVerificationEmail(user);
     user.setEmail(pendingEmail);
     user.setEmailVerifiedAt(OffsetDateTime.now(ZoneOffset.UTC));
+    user.setActive(true);
     try {
       userRepository.saveAndFlush(user);
     } catch (DataIntegrityViolationException ex) {
@@ -72,7 +89,8 @@ public class DomainUserAuthService {
       throw ex;
     }
     userOtpService.clearVerificationCode(user);
-    return new ApiMessage("ok");
+    String token = domainUserJwtService.generateToken(user);
+    return new UserLoginResponse(token, toAuthResponse(user));
   }
 
   public ApiMessage forgotPassword(Long domainId, UserForgotPasswordRequest request) {
@@ -116,7 +134,7 @@ public class DomainUserAuthService {
     if (body.values() != null) {
       userService.applyProfileValues(user, domainId, body.values());
     }
-    User saved = userRepository.save(user);
+    User saved = userRepository.saveAndFlush(user);
     return userService.toResponse(saved);
   }
 
@@ -151,7 +169,19 @@ public class DomainUserAuthService {
         user.getDomain().getId(),
         user.getEmail(),
         user.getEmailVerifiedAt() != null,
+        user.isActive(),
         user.getCreatedAt()
+    );
+  }
+
+  private UserAuthResponse toAuthResponse(Long domainId, UserResponse user) {
+    return new UserAuthResponse(
+        user.id(),
+        domainId,
+        user.email(),
+        user.confirmed(),
+        user.active(),
+        user.createdAt()
     );
   }
 

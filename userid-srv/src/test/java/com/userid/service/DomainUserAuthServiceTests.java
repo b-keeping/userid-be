@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import com.userid.api.common.ApiMessage;
 import com.userid.api.user.UserConfirmRequest;
 import com.userid.api.user.UserForgotPasswordRequest;
+import com.userid.api.user.UserLoginResponse;
 import com.userid.dal.entity.Domain;
 import com.userid.dal.entity.OtpType;
 import com.userid.dal.entity.OtpUser;
@@ -60,12 +61,17 @@ class DomainUserAuthServiceTests {
     OtpUser otp = OtpUser.builder().user(user).type(OtpType.VERIFICATION).code("abc123").build();
 
     when(userOtpService.requireValid(OtpType.VERIFICATION, "abc123")).thenReturn(otp);
+    when(domainUserJwtService.generateToken(user)).thenReturn("jwt-token");
 
-    ApiMessage response = domainUserAuthService.confirm(7L, new UserConfirmRequest("abc123"));
+    UserLoginResponse response = domainUserAuthService.confirm(7L, new UserConfirmRequest("abc123"));
 
-    assertThat(response.message()).isEqualTo("ok");
+    assertThat(response.token()).isEqualTo("jwt-token");
+    assertThat(response.user()).isNotNull();
+    assertThat(response.user().confirmed()).isTrue();
+    assertThat(response.user().active()).isTrue();
     assertThat(user.getEmail()).isEqualTo("user@example.org");
     assertThat(user.getEmailVerifiedAt()).isNotNull();
+    verify(domainUserJwtService).generateToken(user);
     verify(userOtpService).clearVerificationCode(user);
     verify(userRepository).saveAndFlush(user);
   }

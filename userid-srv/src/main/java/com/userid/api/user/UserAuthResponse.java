@@ -7,5 +7,6 @@ public record UserAuthResponse(
     Long domainId,
     String email,
     boolean confirmed,
+    boolean active,
     OffsetDateTime createdAt
 ) {}

@@ -32,9 +32,9 @@ public class AuthServerApiClient {
     return properties.isEnabled();
   }
 
-  public void register(AuthServerRegisterRequest request) {
+  public AuthServerLoginResponse register(AuthServerRegisterRequest request) {
     if (!properties.isEnabled()) {
-      return;
+      return null;
     }
 
     requireConfigured();
@@ -51,15 +51,18 @@ public class AuthServerApiClient {
         valuesCount);
 
     try {
-      restTemplate.exchange(
+      AuthServerLoginResponse response = restTemplate.exchange(
           endpoint,
           HttpMethod.POST,
           new HttpEntity<>(request, requestHeaders()),
-          Void.class);
+          AuthServerLoginResponse.class)
+          .getBody();
       log.info(
-          "Auth server register success domainId={} email={}",
+          "Auth server register success domainId={} email={} hasToken={}",
           properties.getDomainId(),
-          request.email());
+          request.email(),
+          response != null && StringUtils.hasText(response.token()));
+      return response;
     } catch (HttpStatusCodeException ex) {
       ResponseStatusException mapped = mapStatusException(ex, "Registration failed on auth server");
       log.warn(
@@ -79,9 +82,9 @@ public class AuthServerApiClient {
     }
   }
 
-  public void confirm(String code) {
+  public AuthServerLoginResponse confirm(String code) {
     if (!properties.isEnabled()) {
-      return;
+      return null;
     }
 
     requireConfigured();
@@ -97,12 +100,18 @@ public class AuthServerApiClient {
         codeLength);
 
     try {
-      restTemplate.exchange(
+      AuthServerLoginResponse response = restTemplate.exchange(
           endpoint,
           HttpMethod.POST,
           new HttpEntity<>(new AuthServerConfirmRequest(code), requestHeaders()),
-          Void.class);
-      log.info("Auth server confirm success domainId={} codeLength={}", properties.getDomainId(), codeLength);
+          AuthServerLoginResponse.class)
+          .getBody();
+      log.info(
+          "Auth server confirm success domainId={} codeLength={} hasToken={}",
+          properties.getDomainId(),
+          codeLength,
+          response != null && StringUtils.hasText(response.token()));
+      return response;
     } catch (HttpStatusCodeException ex) {
       ResponseStatusException mapped = mapStatusException(ex, "Confirmation failed on auth server");
       log.warn(
