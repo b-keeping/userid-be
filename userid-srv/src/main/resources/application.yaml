@@ -48,3 +48,19 @@ auth:
     organization: ${POSTAL_ORG:Org1}
     template-server: ${POSTAL_TEMPLATE_SERVER:Server1}
     smtp-name: ${DOMAIN_SMTP_LOGIN:}
+  owner-social:
+    google:
+      enabled: ${OWNER_SOCIAL_GOOGLE_ENABLED:false}
+      client-id: ${OWNER_SOCIAL_GOOGLE_CLIENT_ID:}
+      client-secret: ${OWNER_SOCIAL_GOOGLE_CLIENT_SECRET:}
+      callback-uri: ${OWNER_SOCIAL_GOOGLE_CALLBACK_URI:}
+    yandex:
+      enabled: ${OWNER_SOCIAL_YANDEX_ENABLED:false}
+      client-id: ${OWNER_SOCIAL_YANDEX_CLIENT_ID:}
+      client-secret: ${OWNER_SOCIAL_YANDEX_CLIENT_SECRET:}
+      callback-uri: ${OWNER_SOCIAL_YANDEX_CALLBACK_URI:}
+    vk:
+      enabled: ${OWNER_SOCIAL_VK_ENABLED:false}
+      client-id: ${OWNER_SOCIAL_VK_CLIENT_ID:}
+      client-secret: ${OWNER_SOCIAL_VK_CLIENT_SECRET:}
+      callback-uri: ${OWNER_SOCIAL_VK_CALLBACK_URI:}
