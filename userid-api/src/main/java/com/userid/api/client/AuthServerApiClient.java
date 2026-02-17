@@ -196,7 +196,7 @@ public class AuthServerApiClient {
 
     String endpoint = "%s%s".formatted(
         normalizeBaseUrl(properties.getBaseUrl()),
-        UseridApiEndpoints.externalDomainUsersSocialLogin(properties.getDomainId(), provider));
+        UseridApiEndpoints.externalDomainUsersSocialLogin(properties.getDomainId()));
     log.info(
         "Auth server social-login start url={} domainId={} provider={}",
         endpoint,
@@ -207,7 +207,9 @@ public class AuthServerApiClient {
       AuthServerLoginResponse response = restTemplate.exchange(
               endpoint,
               HttpMethod.POST,
-              new HttpEntity<>(request, requestHeaders()),
+              new HttpEntity<>(
+                  new AuthServerSocialAuthRequest(provider.pathValue(), request.code().trim()),
+                  requestHeaders()),
               AuthServerLoginResponse.class)
           .getBody();
       log.info(

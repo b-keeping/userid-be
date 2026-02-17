@@ -1,6 +1,7 @@
 package com.userid.api.user;
 
 import com.userid.api.common.ApiMessage;
+import com.userid.api.client.AuthServerSocialAuthRequest;
 import com.userid.api.client.AuthServerSocialLoginRequest;
 import com.userid.api.client.AuthServerSocialProvider;
 import com.userid.api.client.DomainSocialProviderConfigResponse;
@@ -55,14 +56,16 @@ public class DomainPublicUserController {
   public UserLoginResponse socialLogin(
       @AuthenticationPrincipal DomainApiPrincipal principal,
       @PathVariable Long domainId,
-      @PathVariable String provider,
-      @RequestBody AuthServerSocialLoginRequest request
+      @RequestBody AuthServerSocialAuthRequest request
   ) {
     requireDomain(principal, domainId);
+    if (request == null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Social auth payload is required");
+    }
     return domainUserSocialAuthService.login(
         domainId,
-        parseProvider(provider),
-        request);
+        parseProvider(request.provider()),
+        new AuthServerSocialLoginRequest(request.code()));
   }
 
   @GetMapping(UseridApiEndpoints.SOCIAL_PROVIDER_CONFIG)

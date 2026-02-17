@@ -3,7 +3,9 @@ package com.userid.api.client;
 import java.util.Arrays;
 
 public enum AuthServerSocialProvider {
-  GOOGLE("google");
+  GOOGLE("google"),
+  YANDEX("yandex"),
+  VK("vk");
 
   private final String pathValue;
 
