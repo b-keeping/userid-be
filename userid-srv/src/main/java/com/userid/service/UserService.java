@@ -19,6 +19,7 @@ import com.userid.dal.repo.DomainRepository;
 import com.userid.dal.repo.ProfileFieldRepository;
 import com.userid.dal.repo.UserProfileValueRepository;
 import com.userid.dal.repo.UserRepository;
+import com.userid.dal.repo.UserSocialIdentityRepository;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -47,6 +48,7 @@ public class UserService {
   private final ProfileFieldRepository profileFieldRepository;
   private final UserProfileValueRepository userProfileValueRepository;
   private final UserRepository userRepository;
+  private final UserSocialIdentityRepository userSocialIdentityRepository;
   private final AccessService accessService;
   private final ObjectMapper objectMapper;
   private final PasswordEncoder passwordEncoder;
@@ -138,6 +140,8 @@ public class UserService {
     User user = userRepository.findByIdAndDomainId(userId, domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     userOtpService.clearAllCodes(user);
+    log.info("DB call userSocialIdentityRepository.deleteByUserId userId={} source=delete", user.getId());
+    userSocialIdentityRepository.deleteByUserId(user.getId());
     log.info("DB call userProfileValueRepository.deleteByUserId userId={} source=delete", user.getId());
     userProfileValueRepository.deleteByUserId(user.getId());
     log.info("DB call userRepository.delete userId={} domainId={} source=delete", user.getId(), domainId);

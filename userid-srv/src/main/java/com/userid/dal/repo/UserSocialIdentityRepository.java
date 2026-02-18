@@ -11,4 +11,6 @@ public interface UserSocialIdentityRepository extends JpaRepository<UserSocialId
       AuthServerSocialProvider provider,
       String providerSubject
   );
+
+  void deleteByUserId(Long userId);
 }

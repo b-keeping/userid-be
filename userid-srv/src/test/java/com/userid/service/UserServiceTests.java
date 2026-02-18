@@ -15,6 +15,7 @@ import com.userid.dal.repo.DomainRepository;
 import com.userid.dal.repo.ProfileFieldRepository;
 import com.userid.dal.repo.UserProfileValueRepository;
 import com.userid.dal.repo.UserRepository;
+import com.userid.dal.repo.UserSocialIdentityRepository;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,6 +38,8 @@ class UserServiceTests {
   @Mock
   private UserRepository userRepository;
   @Mock
+  private UserSocialIdentityRepository userSocialIdentityRepository;
+  @Mock
   private AccessService accessService;
   @Mock
   private PasswordEncoder passwordEncoder;
@@ -54,6 +57,7 @@ class UserServiceTests {
         profileFieldRepository,
         userProfileValueRepository,
         userRepository,
+        userSocialIdentityRepository,
         accessService,
         new ObjectMapper().findAndRegisterModules(),
         passwordEncoder,
