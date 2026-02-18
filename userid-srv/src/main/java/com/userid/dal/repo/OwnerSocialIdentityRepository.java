@@ -10,4 +10,6 @@ public interface OwnerSocialIdentityRepository extends JpaRepository<OwnerSocial
       AuthServerSocialProvider provider,
       String providerSubject
   );
+
+  long deleteByOwnerId(Long ownerId);
 }

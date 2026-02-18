@@ -11,6 +11,7 @@ import com.userid.dal.entity.OwnerRole;
 import com.userid.dal.repo.DomainRepository;
 import com.userid.dal.repo.OwnerDomainRepository;
 import com.userid.dal.repo.OwnerRepository;
+import com.userid.dal.repo.OwnerSocialIdentityRepository;
 import com.userid.api.client.EmailNormalizer;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -32,6 +33,7 @@ public class OwnerService {
   private final OwnerRepository ownerRepository;
   private final OwnerDomainRepository ownerDomainRepository;
   private final DomainRepository domainRepository;
+  private final OwnerSocialIdentityRepository ownerSocialIdentityRepository;
   private final AccessService accessService;
   private final PasswordEncoder passwordEncoder;
   private final OwnerOtpService ownerOtpService;
@@ -187,6 +189,7 @@ public class OwnerService {
     ensureDomainsHaveOtherOwners(user.getId(), currentDomainIds(user.getId()));
     ownerOtpService.clearAllCodes(user);
     ownerDomainRepository.deleteByOwnerId(user.getId());
+    ownerSocialIdentityRepository.deleteByOwnerId(user.getId());
     ownerRepository.delete(user);
   }
 
