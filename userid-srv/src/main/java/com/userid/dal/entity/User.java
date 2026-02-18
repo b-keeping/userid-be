@@ -11,10 +11,13 @@ import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.userid.util.EmailNormalizer;
 import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.Set;
@@ -81,4 +84,11 @@ public class User {
   @Builder.Default
   @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
   private Set<UserProfileValue> values = new HashSet<>();
+
+  @PrePersist
+  @PreUpdate
+  void normalizeEmails() {
+    email = EmailNormalizer.normalizeNullable(email);
+    emailPending = EmailNormalizer.normalizeNullable(emailPending);
+  }
 }

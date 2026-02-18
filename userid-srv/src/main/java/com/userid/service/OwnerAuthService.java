@@ -18,6 +18,7 @@ import com.userid.dal.repo.OwnerDomainRepository;
 import com.userid.dal.repo.OwnerRepository;
 import com.userid.dal.repo.OwnerSocialIdentityRepository;
 import com.userid.security.JwtService;
+import com.userid.util.EmailNormalizer;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Collections;
@@ -115,7 +116,8 @@ public class OwnerAuthService {
   }
 
   public OwnerLoginResponse login(OwnerLoginRequest request) {
-    Owner user = ownerRepository.findByEmail(request.email())
+    String email = normalizeEmail(request.email());
+    Owner user = ownerRepository.findByEmail(email)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials"));
 
     if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
@@ -136,7 +138,8 @@ public class OwnerAuthService {
 
   @Transactional
   public OwnerResponse register(OwnerRegisterRequest request) {
-    Owner existing = ownerRepository.findByEmail(request.email()).orElse(null);
+    String email = normalizeEmail(request.email());
+    Owner existing = ownerRepository.findByEmail(email).orElse(null);
 
     if (existing != null) {
       if (existing.isActive()) {
@@ -153,7 +156,7 @@ public class OwnerAuthService {
     }
 
     Owner user = Owner.builder()
-        .email(request.email())
+        .email(email)
         .passwordHash(passwordEncoder.encode(request.password()))
         .role(OwnerRole.USER)
         .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
@@ -197,7 +200,8 @@ public class OwnerAuthService {
 
   @Transactional
   public void requestPasswordReset(OwnerPasswordResetRequest request) {
-    Owner user = ownerRepository.findByEmail(request.email())
+    String email = normalizeEmail(request.email());
+    Owner user = ownerRepository.findByEmail(email)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Email not found"));
 
     if (!user.isActive()) {
@@ -237,7 +241,7 @@ public class OwnerAuthService {
         .orElse(null);
 
     Owner owner = identity == null
-        ? ownerRepository.findByEmail(socialPrincipal.email()).orElse(null)
+        ? ownerRepository.findByEmail(normalizeEmail(socialPrincipal.email())).orElse(null)
         : identity.getOwner();
     if (owner == null) {
       if (!allowCreate) {
@@ -274,14 +278,15 @@ public class OwnerAuthService {
   }
 
   private void syncOwnerEmail(Owner owner, String email) {
-    if (!StringUtils.hasText(email) || email.equalsIgnoreCase(owner.getEmail())) {
+    String normalizedEmail = normalizeEmail(email);
+    if (!StringUtils.hasText(normalizedEmail) || normalizedEmail.equals(normalizeEmail(owner.getEmail()))) {
       return;
     }
-    boolean existsForAnotherOwner = ownerRepository.findByEmail(email)
+    boolean existsForAnotherOwner = ownerRepository.findByEmail(normalizedEmail)
         .filter(existing -> !existing.getId().equals(owner.getId()))
         .isPresent();
     if (!existsForAnotherOwner) {
-      owner.setEmail(email);
+      owner.setEmail(normalizedEmail);
     }
   }
 
@@ -349,7 +354,7 @@ public class OwnerAuthService {
     }
 
     String subject = userInfo == null ? null : trimToNull(userInfo.sub());
-    String email = userInfo == null ? null : trimToNull(userInfo.email());
+    String email = userInfo == null ? null : normalizeEmail(userInfo.email());
     boolean emailVerified = userInfo != null && Boolean.TRUE.equals(userInfo.emailVerified());
     if (!StringUtils.hasText(subject) || !StringUtils.hasText(email)) {
       throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Google user profile is incomplete");
@@ -407,10 +412,10 @@ public class OwnerAuthService {
     }
 
     String subject = userInfo == null ? null : trimToNull(userInfo.id());
-    String email = userInfo == null ? null : trimToNull(userInfo.defaultEmail());
+    String email = userInfo == null ? null : normalizeEmail(userInfo.defaultEmail());
     if (!StringUtils.hasText(email) && userInfo != null && userInfo.emails() != null) {
       email = userInfo.emails().stream()
-          .map(this::trimToNull)
+          .map(this::normalizeEmail)
           .filter(StringUtils::hasText)
           .findFirst()
           .orElse(null);
@@ -450,7 +455,7 @@ public class OwnerAuthService {
       throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "VK token response is invalid");
     }
 
-    String email = trimToNull(tokenResponse.email());
+    String email = normalizeEmail(tokenResponse.email());
     if (!StringUtils.hasText(email)) {
       throw new ResponseStatusException(
           HttpStatus.UNAUTHORIZED,
@@ -485,6 +490,10 @@ public class OwnerAuthService {
       return null;
     }
     return value.trim();
+  }
+
+  private String normalizeEmail(String value) {
+    return EmailNormalizer.normalizeNullable(value);
   }
 
   private OwnerResponse toResponse(Owner user) {

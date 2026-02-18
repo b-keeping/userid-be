@@ -16,6 +16,7 @@ import com.userid.dal.entity.User;
 import com.userid.dal.repo.UserRepository;
 import com.userid.security.DomainUserJwtService;
 import com.userid.security.DomainUserPrincipal;
+import com.userid.util.EmailNormalizer;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -46,13 +47,16 @@ public class DomainUserAuthService {
       if (ex.getStatusCode().value() != HttpStatus.CONFLICT.value()) {
         throw ex;
       }
-      return login(domainId, new UserLoginRequest(request.email(), request.password()));
+      return login(domainId, new UserLoginRequest(
+          EmailNormalizer.normalizeNullable(request.email()),
+          request.password()));
     }
   }
 
   public UserLoginResponse login(Long domainId, UserLoginRequest request) {
-    User user = userRepository.findByDomainIdAndEmail(domainId, request.email())
-        .or(() -> userRepository.findByDomainIdAndEmailPending(domainId, request.email()))
+    String email = EmailNormalizer.normalizeNullable(request.email());
+    User user = userRepository.findByDomainIdAndEmail(domainId, email)
+        .or(() -> userRepository.findByDomainIdAndEmailPending(domainId, email))
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
     if (user.getEmailVerifiedAt() == null) {
@@ -94,8 +98,9 @@ public class DomainUserAuthService {
   }
 
   public ApiMessage forgotPassword(Long domainId, UserForgotPasswordRequest request) {
-    User user = userRepository.findByDomainIdAndEmail(domainId, request.email())
-        .or(() -> userRepository.findByDomainIdAndEmailPending(domainId, request.email()))
+    String email = EmailNormalizer.normalizeNullable(request.email());
+    User user = userRepository.findByDomainIdAndEmail(domainId, email)
+        .or(() -> userRepository.findByDomainIdAndEmailPending(domainId, email))
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     if (user.getEmailVerifiedAt() == null) {
       String verificationCode = userOtpService.createVerificationCode(user);
@@ -142,8 +147,9 @@ public class DomainUserAuthService {
   }
 
   public ApiMessage resendVerification(Long domainId, UserForgotPasswordRequest request) {
-    User user = userRepository.findByDomainIdAndEmail(domainId, request.email())
-        .or(() -> userRepository.findByDomainIdAndEmailPending(domainId, request.email()))
+    String email = EmailNormalizer.normalizeNullable(request.email());
+    User user = userRepository.findByDomainIdAndEmail(domainId, email)
+        .or(() -> userRepository.findByDomainIdAndEmailPending(domainId, email))
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     String code = userOtpService.createVerificationCode(user);
     emailService.sendOtpEmail(user.getDomain(), resolveVerificationEmail(user), code);

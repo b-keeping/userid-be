@@ -20,6 +20,7 @@ import com.userid.dal.repo.ProfileFieldRepository;
 import com.userid.dal.repo.UserProfileValueRepository;
 import com.userid.dal.repo.UserRepository;
 import com.userid.dal.repo.UserSocialIdentityRepository;
+import com.userid.util.EmailNormalizer;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -151,7 +152,7 @@ public class UserService {
   @Transactional
   private UserResponse registerInternal(Domain domain, UserRegistrationRequest request) {
     Long domainId = domain.getId();
-    String email = request.email() == null ? null : request.email().trim();
+    String email = EmailNormalizer.normalizeNullable(request.email());
     Optional<User> existingUser = findByDomainAndEmailOrPending(domainId, email);
     if (existingUser.isPresent()) {
       User existing = existingUser.get();
@@ -204,7 +205,7 @@ public class UserService {
 
   private UserResponse refreshUnconfirmedRegistration(User user, Domain domain, UserRegistrationRequest request) {
     Long domainId = domain.getId();
-    String email = request.email() == null ? null : request.email().trim();
+    String email = EmailNormalizer.normalizeNullable(request.email());
     String currentEmail = resolveDisplayedEmail(user);
     boolean emailChanged = currentEmail == null || !currentEmail.equals(email);
     user.setEmail(email);
@@ -259,7 +260,7 @@ public class UserService {
       user.setPasswordHash(passwordEncoder.encode(request.password()));
     }
     if (request.email() != null && !request.email().isBlank()) {
-      String requestedEmail = request.email().trim();
+      String requestedEmail = EmailNormalizer.normalizeNullable(request.email());
       String currentEmail = resolveDisplayedEmail(user);
       if (currentEmail == null || !requestedEmail.equals(currentEmail)) {
         emailChanged = true;

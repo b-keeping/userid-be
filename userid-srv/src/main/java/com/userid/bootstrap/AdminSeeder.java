@@ -3,6 +3,7 @@ package com.userid.bootstrap;
 import com.userid.dal.entity.Owner;
 import com.userid.dal.entity.OwnerRole;
 import com.userid.dal.repo.OwnerRepository;
+import com.userid.util.EmailNormalizer;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,12 @@ public class AdminSeeder implements CommandLineRunner {
       if (existing.getEmail() == null || existing.getEmail().isBlank()) {
         existing.setEmail(DEFAULT_ADMIN_EMAIL);
         changed = true;
+      } else {
+        String normalizedEmail = EmailNormalizer.normalizeNullable(existing.getEmail());
+        if (!normalizedEmail.equals(existing.getEmail())) {
+          existing.setEmail(normalizedEmail);
+          changed = true;
+        }
       }
       if (!existing.isActive()) {
         existing.setActive(true);
@@ -40,7 +47,7 @@ public class AdminSeeder implements CommandLineRunner {
     }
 
     Owner admin = Owner.builder()
-        .email(DEFAULT_ADMIN_EMAIL)
+        .email(EmailNormalizer.normalizeNullable(DEFAULT_ADMIN_EMAIL))
         .passwordHash(passwordEncoder.encode(DEFAULT_ADMIN_PASSWORD))
         .role(OwnerRole.ADMIN)
         .createdAt(OffsetDateTime.now(ZoneOffset.UTC))

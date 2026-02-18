@@ -13,6 +13,7 @@ import com.userid.dal.repo.ProfileFieldRepository;
 import com.userid.dal.repo.UserRepository;
 import com.userid.dal.repo.UserSocialIdentityRepository;
 import com.userid.security.DomainUserJwtService;
+import com.userid.util.EmailNormalizer;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -155,7 +156,7 @@ public class DomainUserSocialAuthService {
     }
 
     String subject = userInfo == null ? null : trimToNull(userInfo.sub());
-    String email = userInfo == null ? null : trimToNull(userInfo.email());
+    String email = userInfo == null ? null : normalizeEmail(userInfo.email());
     boolean emailVerified = userInfo != null && Boolean.TRUE.equals(userInfo.emailVerified());
     if (!StringUtils.hasText(subject) || !StringUtils.hasText(email)) {
       throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Google user profile is incomplete");
@@ -217,10 +218,10 @@ public class DomainUserSocialAuthService {
     }
 
     String subject = userInfo == null ? null : trimToNull(userInfo.id());
-    String email = userInfo == null ? null : trimToNull(userInfo.defaultEmail());
+    String email = userInfo == null ? null : normalizeEmail(userInfo.defaultEmail());
     if (!StringUtils.hasText(email) && userInfo != null && userInfo.emails() != null) {
       email = userInfo.emails().stream()
-          .map(this::trimToNull)
+          .map(this::normalizeEmail)
           .filter(StringUtils::hasText)
           .findFirst()
           .orElse(null);
@@ -261,7 +262,7 @@ public class DomainUserSocialAuthService {
     }
 
     String subject = String.valueOf(tokenResponse.userId());
-    String email = trimToNull(tokenResponse.email());
+    String email = normalizeEmail(tokenResponse.email());
 
     String vkProfileUserId = resolveVkProfileUserId(config.getDomain().getId(), tokenResponse);
     if (StringUtils.hasText(vkProfileUserId)) {
@@ -406,6 +407,10 @@ public class DomainUserSocialAuthService {
       return null;
     }
     return value.trim();
+  }
+
+  private String normalizeEmail(String value) {
+    return EmailNormalizer.normalizeNullable(value);
   }
 
   private record SocialPrincipal(String subject, String email, boolean emailVerified) {

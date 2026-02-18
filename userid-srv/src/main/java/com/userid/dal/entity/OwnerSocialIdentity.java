@@ -15,6 +15,7 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import com.userid.util.EmailNormalizer;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import lombok.AllArgsConstructor;
@@ -74,10 +75,12 @@ public class OwnerSocialIdentity {
     OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
     createdAt = now;
     updatedAt = now;
+    providerEmail = EmailNormalizer.normalizeNullable(providerEmail);
   }
 
   @PreUpdate
   void onUpdate() {
     updatedAt = OffsetDateTime.now(ZoneOffset.UTC);
+    providerEmail = EmailNormalizer.normalizeNullable(providerEmail);
   }
 }

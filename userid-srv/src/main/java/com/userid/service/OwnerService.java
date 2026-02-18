@@ -11,6 +11,7 @@ import com.userid.dal.entity.OwnerRole;
 import com.userid.dal.repo.DomainRepository;
 import com.userid.dal.repo.OwnerDomainRepository;
 import com.userid.dal.repo.OwnerRepository;
+import com.userid.util.EmailNormalizer;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -37,8 +38,9 @@ public class OwnerService {
 
   public OwnerResponse create(Long ownerId, OwnerRequest request) {
     accessService.requireAdmin(ownerId);
+    String email = normalizeEmail(request.email());
 
-    ownerRepository.findByEmail(request.email())
+    ownerRepository.findByEmail(email)
         .ifPresent(user -> {
           throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists");
         });
@@ -52,7 +54,7 @@ public class OwnerService {
     String password = requirePassword(request.password());
 
     Owner user = Owner.builder()
-        .email(request.email())
+        .email(email)
         .passwordHash(passwordEncoder.encode(password))
         .role(request.role())
         .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
@@ -122,11 +124,12 @@ public class OwnerService {
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Owner not found"));
 
     if (request.email() != null && !request.email().isBlank()
-        && !request.email().equals(user.getEmail())) {
-      if (ownerRepository.existsByEmail(request.email())) {
+        && !normalizeEmail(request.email()).equals(normalizeEmail(user.getEmail()))) {
+      String email = normalizeEmail(request.email());
+      if (ownerRepository.existsByEmail(email)) {
         throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists");
       }
-      user.setEmail(request.email());
+      user.setEmail(email);
     }
 
     if (request.password() != null && !request.password().isBlank()) {
@@ -257,5 +260,9 @@ public class OwnerService {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password is required");
     }
     return password;
+  }
+
+  private String normalizeEmail(String email) {
+    return EmailNormalizer.normalizeNullable(email);
   }
 }
