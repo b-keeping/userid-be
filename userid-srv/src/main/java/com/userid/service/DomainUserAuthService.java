@@ -16,7 +16,7 @@ import com.userid.dal.entity.User;
 import com.userid.dal.repo.UserRepository;
 import com.userid.security.DomainUserJwtService;
 import com.userid.security.DomainUserPrincipal;
-import com.userid.util.EmailNormalizer;
+import com.userid.api.client.EmailNormalizer;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;

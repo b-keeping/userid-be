@@ -3,7 +3,7 @@ package com.userid.bootstrap;
 import com.userid.dal.entity.Owner;
 import com.userid.dal.entity.OwnerRole;
 import com.userid.dal.repo.OwnerRepository;
-import com.userid.util.EmailNormalizer;
+import com.userid.api.client.EmailNormalizer;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import lombok.RequiredArgsConstructor;

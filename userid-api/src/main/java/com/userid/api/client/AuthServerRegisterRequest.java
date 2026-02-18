@@ -6,4 +6,8 @@ public record AuthServerRegisterRequest(
     String email,
     String password,
     List<AuthServerProfileValue> values
-) {}
+) {
+  public AuthServerRegisterRequest {
+    email = EmailNormalizer.normalizeNullable(email);
+  }
+}

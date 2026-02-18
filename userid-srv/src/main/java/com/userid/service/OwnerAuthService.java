@@ -18,7 +18,7 @@ import com.userid.dal.repo.OwnerDomainRepository;
 import com.userid.dal.repo.OwnerRepository;
 import com.userid.dal.repo.OwnerSocialIdentityRepository;
 import com.userid.security.JwtService;
-import com.userid.util.EmailNormalizer;
+import com.userid.api.client.EmailNormalizer;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Collections;

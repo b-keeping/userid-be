@@ -1,6 +1,7 @@
 package com.userid.api.user;
 
 import jakarta.validation.constraints.Email;
+import com.userid.api.client.EmailNormalizer;
 import java.util.List;
 
 public record UserUpdateRequest(
@@ -8,4 +9,8 @@ public record UserUpdateRequest(
     @Email String email,
     List<UserProfileValueRequest> values,
     Boolean confirmed
-) {}
+) {
+  public UserUpdateRequest {
+    email = EmailNormalizer.normalizeNullable(email);
+  }
+}

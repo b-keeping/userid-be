@@ -10,11 +10,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.OneToMany;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-import com.userid.util.EmailNormalizer;
 import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.Set;
@@ -69,10 +66,4 @@ public class Owner {
   @Builder.Default
   @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, orphanRemoval = true)
   private Set<OwnerDomain> domains = new HashSet<>();
-
-  @PrePersist
-  @PreUpdate
-  void normalizeEmail() {
-    email = EmailNormalizer.normalizeNullable(email);
-  }
 }

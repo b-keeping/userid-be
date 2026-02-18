@@ -13,7 +13,7 @@ import com.userid.dal.repo.ProfileFieldRepository;
 import com.userid.dal.repo.UserRepository;
 import com.userid.dal.repo.UserSocialIdentityRepository;
 import com.userid.security.DomainUserJwtService;
-import com.userid.util.EmailNormalizer;
+import com.userid.api.client.EmailNormalizer;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;

@@ -12,10 +12,8 @@ import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-import com.userid.util.EmailNormalizer;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import lombok.AllArgsConstructor;
@@ -75,11 +73,5 @@ public class UserSocialIdentity {
   @PrePersist
   void onCreate() {
     createdAt = OffsetDateTime.now(ZoneOffset.UTC);
-    providerEmail = EmailNormalizer.normalizeNullable(providerEmail);
-  }
-
-  @PreUpdate
-  void onUpdate() {
-    providerEmail = EmailNormalizer.normalizeNullable(providerEmail);
   }
 }
