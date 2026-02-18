@@ -6,6 +6,8 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ProfileFieldRepository extends JpaRepository<ProfileField, Long> {
+  boolean existsByDomainId(Long domainId);
+
   List<ProfileField> findByDomainIdOrderBySortOrderAscIdAsc(Long domainId);
 
   Optional<ProfileField> findByDomainIdAndName(Long domainId, String name);

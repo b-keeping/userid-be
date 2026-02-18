@@ -9,6 +9,7 @@ import com.userid.dal.entity.DomainSocialProviderConfig;
 import com.userid.dal.entity.User;
 import com.userid.dal.entity.UserSocialIdentity;
 import com.userid.dal.repo.DomainSocialProviderConfigRepository;
+import com.userid.dal.repo.ProfileFieldRepository;
 import com.userid.dal.repo.UserRepository;
 import com.userid.dal.repo.UserSocialIdentityRepository;
 import com.userid.security.DomainUserJwtService;
@@ -45,6 +46,7 @@ public class DomainUserSocialAuthService {
   private static final String VK_API_VERSION = "5.199";
 
   private final DomainSocialProviderConfigRepository domainSocialProviderConfigRepository;
+  private final ProfileFieldRepository profileFieldRepository;
   private final UserSocialIdentityRepository userSocialIdentityRepository;
   private final UserRepository userRepository;
   private final PasswordEncoder passwordEncoder;
@@ -69,6 +71,7 @@ public class DomainUserSocialAuthService {
     if (!Boolean.TRUE.equals(config.getEnabled())) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Social provider is disabled for this domain");
     }
+    boolean profileCompletionRequired = profileFieldRepository.existsByDomainId(domainId);
 
     SocialPrincipal socialPrincipal = resolveSocialPrincipal(provider, config, code.trim());
 
@@ -83,9 +86,9 @@ public class DomainUserSocialAuthService {
         .findByDomainIdAndProviderAndProviderSubject(domainId, provider, socialPrincipal.subject())
         .orElse(null);
     User user = identity == null
-        ? resolveOrCreateUser(config.getDomain(), socialPrincipal)
+        ? resolveOrCreateUser(config.getDomain(), socialPrincipal, profileCompletionRequired)
         : identity.getUser();
-    boolean userChanged = syncUserFromSocial(user, socialPrincipal);
+    boolean userChanged = syncUserFromSocial(user, socialPrincipal, profileCompletionRequired);
     if (userChanged) {
       user = saveUser(user);
     }
@@ -316,7 +319,11 @@ public class DomainUserSocialAuthService {
     }
   }
 
-  private User resolveOrCreateUser(Domain domain, SocialPrincipal socialPrincipal) {
+  private User resolveOrCreateUser(
+      Domain domain,
+      SocialPrincipal socialPrincipal,
+      boolean profileCompletionRequired
+  ) {
     return userRepository.findByDomainIdAndEmail(domain.getId(), socialPrincipal.email())
         .or(() -> userRepository.findByDomainIdAndEmailPending(domain.getId(), socialPrincipal.email()))
         .orElseGet(() -> saveUser(User.builder()
@@ -326,7 +333,7 @@ public class DomainUserSocialAuthService {
             .passwordHash(passwordEncoder.encode(UUID.randomUUID().toString()))
             .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
             .emailVerifiedAt(OffsetDateTime.now(ZoneOffset.UTC))
-            .active(false)
+            .active(!profileCompletionRequired)
             .build()));
   }
 
@@ -338,7 +345,11 @@ public class DomainUserSocialAuthService {
     }
   }
 
-  private boolean syncUserFromSocial(User user, SocialPrincipal socialPrincipal) {
+  private boolean syncUserFromSocial(
+      User user,
+      SocialPrincipal socialPrincipal,
+      boolean profileCompletionRequired
+  ) {
     boolean changed = false;
     if (!StringUtils.hasText(user.getEmailPending())) {
       user.setEmailPending(socialPrincipal.email());
@@ -350,6 +361,10 @@ public class DomainUserSocialAuthService {
     }
     if (user.getEmailVerifiedAt() == null) {
       user.setEmailVerifiedAt(OffsetDateTime.now(ZoneOffset.UTC));
+      changed = true;
+    }
+    if (!profileCompletionRequired && !user.isActive()) {
+      user.setActive(true);
       changed = true;
     }
     return changed;
