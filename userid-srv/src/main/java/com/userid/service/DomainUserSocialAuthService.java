@@ -326,7 +326,7 @@ public class DomainUserSocialAuthService {
             .passwordHash(passwordEncoder.encode(UUID.randomUUID().toString()))
             .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
             .emailVerifiedAt(OffsetDateTime.now(ZoneOffset.UTC))
-            .active(true)
+            .active(false)
             .build()));
   }
 
@@ -350,10 +350,6 @@ public class DomainUserSocialAuthService {
     }
     if (user.getEmailVerifiedAt() == null) {
       user.setEmailVerifiedAt(OffsetDateTime.now(ZoneOffset.UTC));
-      changed = true;
-    }
-    if (!user.isActive()) {
-      user.setActive(true);
       changed = true;
     }
     return changed;

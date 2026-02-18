@@ -133,6 +133,9 @@ public class DomainUserAuthService {
     }
     if (body.values() != null) {
       userService.applyProfileValues(user, domainId, body.values());
+      if (!user.isActive()) {
+        user.setActive(true);
+      }
     }
     User saved = userRepository.saveAndFlush(user);
     return userService.toResponse(saved);
