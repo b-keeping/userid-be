@@ -131,4 +131,55 @@ class OwnerAuthServiceTests {
         "owner@identio.ru",
         "https://identio.ru/app/verify?token=verify-code");
   }
+
+  @Test
+  void registerWhenOwnerExistsAndActiveAndPasswordMatchesReturnsSuccess() {
+    Owner existing = Owner.builder()
+        .id(12L)
+        .email("owner@identio.ru")
+        .passwordHash("hash")
+        .role(OwnerRole.USER)
+        .createdAt(OffsetDateTime.now())
+        .active(true)
+        .emailVerifiedAt(OffsetDateTime.now())
+        .build();
+
+    when(ownerRepository.findByEmail("owner@identio.ru")).thenReturn(Optional.of(existing));
+    when(passwordEncoder.matches("secret", "hash")).thenReturn(true);
+    when(ownerDomainRepository.findByOwnerId(12L)).thenReturn(java.util.List.of());
+
+    OwnerResponse response = ownerAuthService.register(new OwnerRegisterRequest("owner@identio.ru", "secret"));
+
+    assertThat(response.id()).isEqualTo(12L);
+    verify(ownerOtpService, never()).createResetCode(existing);
+    verify(emailService, never()).sendPasswordResetEmail("owner@identio.ru", "https://identio.ru/app/reset?token=reset-code");
+  }
+
+  @Test
+  void registerWhenOwnerExistsAndActiveAndPasswordMismatchSendsResetEmailAndReturnsSuccess() {
+    Owner existing = Owner.builder()
+        .id(13L)
+        .email("owner@identio.ru")
+        .passwordHash("hash")
+        .role(OwnerRole.USER)
+        .createdAt(OffsetDateTime.now())
+        .active(true)
+        .emailVerifiedAt(OffsetDateTime.now())
+        .build();
+
+    when(ownerRepository.findByEmail("owner@identio.ru")).thenReturn(Optional.of(existing));
+    when(passwordEncoder.matches("secret", "hash")).thenReturn(false);
+    when(ownerOtpService.createResetCode(existing)).thenReturn("reset-code");
+    when(ownerRepository.save(existing)).thenReturn(existing);
+    when(ownerDomainRepository.findByOwnerId(13L)).thenReturn(java.util.List.of());
+
+    OwnerResponse response = ownerAuthService.register(new OwnerRegisterRequest("owner@identio.ru", "secret"));
+
+    assertThat(response.id()).isEqualTo(13L);
+    verify(ownerOtpService).createResetCode(existing);
+    verify(ownerRepository).save(existing);
+    verify(emailService).sendPasswordResetEmail(
+        "owner@identio.ru",
+        "https://identio.ru/app/reset?token=reset-code");
+  }
 }

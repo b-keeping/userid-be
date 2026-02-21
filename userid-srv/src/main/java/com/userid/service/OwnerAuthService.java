@@ -147,7 +147,11 @@ public class OwnerAuthService {
 
     if (existing != null) {
       if (existing.isActive()) {
-        throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists");
+        if (passwordEncoder.matches(request.password(), existing.getPasswordHash())) {
+          return toResponse(existing);
+        }
+        sendOwnerPasswordResetBestEffort(existing);
+        return toResponse(existing);
       }
       existing.setPasswordHash(passwordEncoder.encode(request.password()));
       existing.setActive(false);
@@ -511,6 +515,20 @@ public class OwnerAuthService {
     } catch (Exception ex) {
       log.warn(
           "Owner verification resend failed ownerId={} email={} reason={}",
+          owner.getId(),
+          owner.getEmail(),
+          ex.getMessage());
+    }
+  }
+
+  private void sendOwnerPasswordResetBestEffort(Owner owner) {
+    try {
+      String code = ownerOtpService.createResetCode(owner);
+      ownerRepository.save(owner);
+      emailService.sendPasswordResetEmail(owner.getEmail(), buildResetLink(code));
+    } catch (Exception ex) {
+      log.warn(
+          "Owner password reset send failed ownerId={} email={} reason={}",
           owner.getId(),
           owner.getEmail(),
           ex.getMessage());

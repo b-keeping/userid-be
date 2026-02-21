@@ -10,6 +10,7 @@ import com.userid.api.common.ApiMessage;
 import com.userid.api.user.UserConfirmRequest;
 import com.userid.api.user.UserForgotPasswordRequest;
 import com.userid.api.user.UserLoginResponse;
+import com.userid.api.user.UserRegistrationRequest;
 import com.userid.dal.entity.Domain;
 import com.userid.dal.entity.OtpType;
 import com.userid.dal.entity.OtpUser;
@@ -139,5 +140,65 @@ class DomainUserAuthServiceTests {
     verify(userRepository).save(user);
     verify(emailService).sendUserPasswordResetCode(domain, "user@example.org", "reset-code");
     verify(userOtpService, never()).createVerificationCode(user);
+  }
+
+  @Test
+  void registerWhenExistingActiveAndPasswordMatchesReturnsLogin() {
+    Domain domain = Domain.builder().id(7L).name("example.org").build();
+    User user = User.builder()
+        .id(10L)
+        .domain(domain)
+        .email("user@example.org")
+        .emailPending("user@example.org")
+        .passwordHash("hash")
+        .createdAt(OffsetDateTime.now())
+        .emailVerifiedAt(OffsetDateTime.now())
+        .active(true)
+        .build();
+    UserRegistrationRequest request = new UserRegistrationRequest("user@example.org", "secret", java.util.List.of());
+
+    when(userService.registerByDomain(7L, request))
+        .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT, "User already registered"));
+    when(userRepository.findByDomainIdAndEmail(7L, "user@example.org")).thenReturn(java.util.Optional.of(user));
+    when(passwordEncoder.matches("secret", "hash")).thenReturn(true);
+    when(domainUserJwtService.generateToken(user)).thenReturn("jwt-token");
+
+    UserLoginResponse response = domainUserAuthService.register(7L, request);
+
+    assertThat(response.token()).isEqualTo("jwt-token");
+    assertThat(response.user()).isNotNull();
+    verify(userOtpService, never()).createResetCode(user);
+    verify(emailService, never()).sendUserPasswordResetCode(domain, "user@example.org", "reset-code");
+  }
+
+  @Test
+  void registerWhenExistingActiveAndPasswordMismatchSendsResetAndReturnsNoToken() {
+    Domain domain = Domain.builder().id(7L).name("example.org").build();
+    User user = User.builder()
+        .id(10L)
+        .domain(domain)
+        .email("user@example.org")
+        .emailPending("user@example.org")
+        .passwordHash("hash")
+        .createdAt(OffsetDateTime.now())
+        .emailVerifiedAt(OffsetDateTime.now())
+        .active(true)
+        .build();
+    UserRegistrationRequest request = new UserRegistrationRequest("user@example.org", "secret", java.util.List.of());
+
+    when(userService.registerByDomain(7L, request))
+        .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT, "User already registered"));
+    when(userRepository.findByDomainIdAndEmail(7L, "user@example.org")).thenReturn(java.util.Optional.of(user));
+    when(passwordEncoder.matches("secret", "hash")).thenReturn(false);
+    when(userOtpService.createResetCode(user)).thenReturn("reset-code");
+
+    UserLoginResponse response = domainUserAuthService.register(7L, request);
+
+    assertThat(response.token()).isNull();
+    assertThat(response.user()).isNotNull();
+    verify(userOtpService).createResetCode(user);
+    verify(userRepository).save(user);
+    verify(emailService).sendUserPasswordResetCode(domain, "user@example.org", "reset-code");
+    verify(domainUserJwtService, never()).generateToken(user);
   }
 }

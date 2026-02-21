@@ -21,6 +21,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -31,6 +32,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class DomainUserAuthService {
   private final UserRepository userRepository;
   private final PasswordEncoder passwordEncoder;
@@ -40,6 +42,7 @@ public class DomainUserAuthService {
   private final UserService userService;
 
   public UserLoginResponse register(Long domainId, UserRegistrationRequest request) {
+    String normalizedEmail = EmailNormalizer.normalizeNullable(request.email());
     try {
       UserResponse user = userService.registerByDomain(domainId, request);
       return new UserLoginResponse(null, toAuthResponse(domainId, user));
@@ -47,9 +50,15 @@ public class DomainUserAuthService {
       if (ex.getStatusCode().value() != HttpStatus.CONFLICT.value()) {
         throw ex;
       }
-      return login(domainId, new UserLoginRequest(
-          EmailNormalizer.normalizeNullable(request.email()),
-          request.password()));
+      try {
+        return login(domainId, new UserLoginRequest(normalizedEmail, request.password()));
+      } catch (ResponseStatusException loginEx) {
+        if (loginEx.getStatusCode().value() != HttpStatus.UNAUTHORIZED.value()) {
+          throw loginEx;
+        }
+        User existing = sendPasswordRecoveryBestEffort(domainId, normalizedEmail);
+        return new UserLoginResponse(null, existing == null ? null : toAuthResponse(existing));
+      }
     }
   }
 
@@ -202,6 +211,33 @@ public class DomainUserAuthService {
       return user.getEmail();
     }
     throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User email is not set");
+  }
+
+  private User sendPasswordRecoveryBestEffort(Long domainId, String email) {
+    try {
+      User user = userRepository.findByDomainIdAndEmail(domainId, email)
+          .or(() -> userRepository.findByDomainIdAndEmailPending(domainId, email))
+          .orElse(null);
+      if (user == null) {
+        return null;
+      }
+      if (user.getEmailVerifiedAt() == null) {
+        String verificationCode = userOtpService.createVerificationCode(user);
+        emailService.sendOtpEmail(user.getDomain(), resolveVerificationEmail(user), verificationCode);
+        return user;
+      }
+      String code = userOtpService.createResetCode(user);
+      userRepository.save(user);
+      emailService.sendUserPasswordResetCode(user.getDomain(), user.getEmail(), code);
+      return user;
+    } catch (Exception ex) {
+      log.warn(
+          "Register conflict recovery flow failed domainId={} email={} reason={}",
+          domainId,
+          email,
+          ex.getMessage());
+      return null;
+    }
   }
 
   private boolean isDuplicateUserEmailViolation(DataIntegrityViolationException ex) {
