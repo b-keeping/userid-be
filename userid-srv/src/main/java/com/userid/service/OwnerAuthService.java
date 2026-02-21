@@ -24,6 +24,8 @@ import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -41,6 +43,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class OwnerAuthService {
+  private static final Logger log = LoggerFactory.getLogger(OwnerAuthService.class);
   private static final String GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
   private static final String GOOGLE_USERINFO_ENDPOINT = "https://openidconnect.googleapis.com/v1/userinfo";
   private static final String YANDEX_TOKEN_ENDPOINT = "https://oauth.yandex.com/token";
@@ -118,13 +121,14 @@ public class OwnerAuthService {
   public OwnerLoginResponse login(OwnerLoginRequest request) {
     String email = normalizeEmail(request.email());
     Owner user = ownerRepository.findByEmail(email)
-        .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials"));
+        .orElseThrow(this::invalidCredentials);
 
     if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
+      throw invalidCredentials();
     }
     if (!user.isActive()) {
-      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Email is not confirmed");
+      resendVerificationEmailBestEffort(user);
+      throw invalidCredentials();
     }
 
     String token = jwtService.generateToken(user);
@@ -494,6 +498,23 @@ public class OwnerAuthService {
 
   private String normalizeEmail(String value) {
     return EmailNormalizer.normalizeNullable(value);
+  }
+
+  private ResponseStatusException invalidCredentials() {
+    return new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
+  }
+
+  private void resendVerificationEmailBestEffort(Owner owner) {
+    try {
+      String code = ownerOtpService.createVerificationCode(owner);
+      emailService.sendVerificationEmail(owner.getEmail(), buildVerificationLink(code));
+    } catch (Exception ex) {
+      log.warn(
+          "Owner verification resend failed ownerId={} email={} reason={}",
+          owner.getId(),
+          owner.getEmail(),
+          ex.getMessage());
+    }
   }
 
   private OwnerResponse toResponse(Owner user) {
