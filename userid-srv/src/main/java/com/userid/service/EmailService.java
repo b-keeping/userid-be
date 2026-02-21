@@ -69,7 +69,11 @@ public class EmailService {
     message.setTo(to);
     message.setFrom(fromAddress);
     message.setSubject("Подтверждение регистрации");
-    message.setText("Для подтверждения регистрации перейдите по ссылке:\n" + link);
+    message.setText("Здравствуйте!\n"+
+    "Вы зарегистрировались на нашем сервисе. Для активации вашего аккаунта нужно нужно подтвердить email.\n"+
+    "Для подтверждения регистрации перейдите по ссылке:\n" + link+"\n"+
+    "\n\nМ уважением\n"+
+    "Admin");
     mailSender.send(message);
   }
 
