@@ -42,7 +42,7 @@ public class DomainUserSocialAuthService {
   private static final String GOOGLE_USERINFO_ENDPOINT = "https://openidconnect.googleapis.com/v1/userinfo";
   private static final String YANDEX_TOKEN_ENDPOINT = "https://oauth.yandex.com/token";
   private static final String YANDEX_USERINFO_ENDPOINT = "https://login.yandex.ru/info?format=json";
-  private static final String VK_TOKEN_ENDPOINT = "https://oauth.vk.com/access_token";
+  private static final String VK_TOKEN_ENDPOINT = "https://oauth.vk.ru/access_token";
   private static final String VK_USERINFO_ENDPOINT = "https://api.vk.com/method/users.get";
   private static final String VK_API_VERSION = "5.199";
 

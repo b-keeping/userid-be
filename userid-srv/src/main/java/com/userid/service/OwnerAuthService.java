@@ -447,7 +447,7 @@ public class OwnerAuthService {
       tokenResponse = restClient.get()
           .uri(uriBuilder -> uriBuilder
               .scheme("https")
-              .host("oauth.vk.com")
+              .host("oauth.vk.ru")
               .path("/access_token")
               .queryParams(params)
               .build())
