@@ -63,7 +63,11 @@ public class DomainPublicUserController {
     return domainUserSocialAuthService.login(
         domainId,
         parseProvider(request.provider()),
-        new AuthServerSocialLoginRequest(request.code()));
+        new AuthServerSocialLoginRequest(
+            request.code(),
+            request.codeVerifier(),
+            request.deviceId(),
+            request.state()));
   }
 
   @GetMapping(UseridApiEndpoints.SOCIAL_PROVIDER_CONFIG)

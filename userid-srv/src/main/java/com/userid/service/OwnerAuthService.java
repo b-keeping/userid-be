@@ -48,6 +48,8 @@ public class OwnerAuthService {
   private static final String GOOGLE_USERINFO_ENDPOINT = "https://openidconnect.googleapis.com/v1/userinfo";
   private static final String YANDEX_TOKEN_ENDPOINT = "https://oauth.yandex.com/token";
   private static final String YANDEX_USERINFO_ENDPOINT = "https://login.yandex.ru/info?format=json";
+  private static final String VK_TOKEN_ENDPOINT = "https://id.vk.ru/oauth2/auth";
+  private static final String VK_USERINFO_ENDPOINT = "https://id.vk.ru/oauth2/user_info";
 
   private final OwnerRepository ownerRepository;
   private final OwnerDomainRepository ownerDomainRepository;
@@ -243,7 +245,7 @@ public class OwnerAuthService {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Social provider is not configured");
     }
 
-    SocialPrincipal socialPrincipal = resolveSocialPrincipal(provider, providerConfig, request.code().trim());
+    SocialPrincipal socialPrincipal = resolveSocialPrincipal(provider, providerConfig, request);
     OwnerSocialIdentity identity = ownerSocialIdentityRepository
         .findByProviderAndProviderSubject(provider, socialPrincipal.subject())
         .orElse(null);
@@ -317,12 +319,13 @@ public class OwnerAuthService {
   private SocialPrincipal resolveSocialPrincipal(
       AuthServerSocialProvider provider,
       SocialProviderClientConfig providerConfig,
-      String code
+      OwnerSocialAuthRequest request
   ) {
+    String code = request.code().trim();
     return switch (provider) {
       case GOOGLE -> resolveGooglePrincipal(providerConfig, code);
       case YANDEX -> resolveYandexPrincipal(providerConfig, code);
-      case VK -> resolveVkPrincipal(providerConfig, code);
+      case VK -> resolveVkPrincipal(providerConfig, request);
     };
   }
 
@@ -435,22 +438,31 @@ public class OwnerAuthService {
     return new SocialPrincipal(subject, email, true);
   }
 
-  private SocialPrincipal resolveVkPrincipal(SocialProviderClientConfig providerConfig, String code) {
-    MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-    params.add("client_id", providerConfig.clientId());
-    params.add("client_secret", providerConfig.clientSecret());
-    params.add("redirect_uri", providerConfig.callbackUri());
-    params.add("code", code);
+  private SocialPrincipal resolveVkPrincipal(SocialProviderClientConfig providerConfig, OwnerSocialAuthRequest request) {
+    String codeVerifier = trimToNull(request.codeVerifier());
+    String deviceId = trimToNull(request.deviceId());
+    String state = trimToNull(request.state());
+    if (!StringUtils.hasText(codeVerifier) || !StringUtils.hasText(deviceId)) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "VK auth payload is incomplete");
+    }
+
+    MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+    form.add("grant_type", "authorization_code");
+    form.add("code_verifier", codeVerifier);
+    form.add("redirect_uri", providerConfig.callbackUri());
+    form.add("code", request.code().trim());
+    form.add("client_id", providerConfig.clientId());
+    form.add("device_id", deviceId);
+    if (StringUtils.hasText(state)) {
+      form.add("state", state);
+    }
 
     VkTokenResponse tokenResponse;
     try {
-      tokenResponse = restClient.get()
-          .uri(uriBuilder -> uriBuilder
-              .scheme("https")
-              .host("oauth.vk.ru")
-              .path("/access_token")
-              .queryParams(params)
-              .build())
+      tokenResponse = restClient.post()
+          .uri(VK_TOKEN_ENDPOINT)
+          .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+          .body(form)
           .retrieve()
           .body(VkTokenResponse.class);
     } catch (RestClientException ex) {
@@ -463,14 +475,38 @@ public class OwnerAuthService {
       throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "VK token response is invalid");
     }
 
-    String email = normalizeEmail(tokenResponse.email());
+    MultiValueMap<String, String> userInfoForm = new LinkedMultiValueMap<>();
+    userInfoForm.add("client_id", providerConfig.clientId());
+    userInfoForm.add("access_token", tokenResponse.accessToken());
+
+    VkUserInfoResponse userInfoResponse;
+    try {
+      userInfoResponse = restClient.post()
+          .uri(VK_USERINFO_ENDPOINT)
+          .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+          .body(userInfoForm)
+          .retrieve()
+          .body(VkUserInfoResponse.class);
+    } catch (RestClientException ex) {
+      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Failed to resolve VK user profile");
+    }
+
+    Long subjectUserId = tokenResponse.userId();
+    String email = null;
+    if (userInfoResponse != null && userInfoResponse.user() != null) {
+      if (userInfoResponse.user().userId() != null) {
+        subjectUserId = userInfoResponse.user().userId();
+      }
+      email = normalizeEmail(userInfoResponse.user().email());
+    }
+
     if (!StringUtils.hasText(email)) {
       throw new ResponseStatusException(
           HttpStatus.UNAUTHORIZED,
           "VK email is unavailable. Add email scope in VK app settings");
     }
 
-    return new SocialPrincipal(String.valueOf(tokenResponse.userId()), email, true);
+    return new SocialPrincipal(String.valueOf(subjectUserId), email, true);
   }
 
   private SocialProviderClientConfig socialProviderClientConfig(AuthServerSocialProvider provider) {
@@ -617,6 +653,19 @@ public class OwnerAuthService {
   private record VkTokenResponse(
       @com.fasterxml.jackson.annotation.JsonProperty("access_token")
       String accessToken,
+      @com.fasterxml.jackson.annotation.JsonProperty("id_token")
+      String idToken,
+      @com.fasterxml.jackson.annotation.JsonProperty("user_id")
+      Long userId
+  ) {
+  }
+
+  private record VkUserInfoResponse(
+      VkUserInfo user
+  ) {
+  }
+
+  private record VkUserInfo(
       @com.fasterxml.jackson.annotation.JsonProperty("user_id")
       Long userId,
       String email

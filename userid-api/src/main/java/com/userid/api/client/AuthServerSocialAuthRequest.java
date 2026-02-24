@@ -2,6 +2,9 @@ package com.userid.api.client;
 
 public record AuthServerSocialAuthRequest(
     String provider,
-    String code
+    String code,
+    String codeVerifier,
+    String deviceId,
+    String state
 ) {
 }

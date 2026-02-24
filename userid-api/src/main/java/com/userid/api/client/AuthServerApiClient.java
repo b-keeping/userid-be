@@ -217,7 +217,12 @@ public class AuthServerApiClient {
               endpoint,
               HttpMethod.POST,
               new HttpEntity<>(
-                  new AuthServerSocialAuthRequest(provider.pathValue(), request.code().trim()),
+                  new AuthServerSocialAuthRequest(
+                      provider.pathValue(),
+                      request.code().trim(),
+                      request.codeVerifier(),
+                      request.deviceId(),
+                      request.state()),
                   requestHeaders()),
               AuthServerLoginResponse.class)
           .getBody();

@@ -42,9 +42,8 @@ public class DomainUserSocialAuthService {
   private static final String GOOGLE_USERINFO_ENDPOINT = "https://openidconnect.googleapis.com/v1/userinfo";
   private static final String YANDEX_TOKEN_ENDPOINT = "https://oauth.yandex.com/token";
   private static final String YANDEX_USERINFO_ENDPOINT = "https://login.yandex.ru/info?format=json";
-  private static final String VK_TOKEN_ENDPOINT = "https://oauth.vk.ru/access_token";
-  private static final String VK_USERINFO_ENDPOINT = "https://api.vk.com/method/users.get";
-  private static final String VK_API_VERSION = "5.199";
+  private static final String VK_TOKEN_ENDPOINT = "https://id.vk.ru/oauth2/auth";
+  private static final String VK_USERINFO_ENDPOINT = "https://id.vk.ru/oauth2/user_info";
 
   private final DomainSocialProviderConfigRepository domainSocialProviderConfigRepository;
   private final ProfileFieldRepository profileFieldRepository;
@@ -74,7 +73,7 @@ public class DomainUserSocialAuthService {
     }
     boolean profileCompletionRequired = profileFieldRepository.existsByDomainId(domainId);
 
-    SocialPrincipal socialPrincipal = resolveSocialPrincipal(provider, config, code.trim());
+    SocialPrincipal socialPrincipal = resolveSocialPrincipal(provider, config, request);
 
     log.info(
         "Social login resolved principal domainId={} provider={} subject={} email={}",
@@ -107,12 +106,13 @@ public class DomainUserSocialAuthService {
   private SocialPrincipal resolveSocialPrincipal(
       AuthServerSocialProvider provider,
       DomainSocialProviderConfig config,
-      String code
+      AuthServerSocialLoginRequest request
   ) {
+    String code = request.code().trim();
     return switch (provider) {
       case GOOGLE -> resolveGooglePrincipal(config, code);
       case YANDEX -> resolveYandexPrincipal(config, code);
-      case VK -> resolveVkPrincipal(config, code);
+      case VK -> resolveVkPrincipal(config, request);
     };
   }
 
@@ -233,21 +233,32 @@ public class DomainUserSocialAuthService {
     return new SocialPrincipal(subject, email, true);
   }
 
-  private SocialPrincipal resolveVkPrincipal(DomainSocialProviderConfig config, String code) {
+  private SocialPrincipal resolveVkPrincipal(DomainSocialProviderConfig config, AuthServerSocialLoginRequest request) {
     requireProviderConfig(config, "VK social provider is not configured");
+    String codeVerifier = trimToNull(request.codeVerifier());
+    String deviceId = trimToNull(request.deviceId());
+    String state = trimToNull(request.state());
+    if (!StringUtils.hasText(codeVerifier) || !StringUtils.hasText(deviceId)) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "VK auth payload is incomplete");
+    }
 
-    String tokenRequestUri = UriComponentsBuilder.fromUriString(VK_TOKEN_ENDPOINT)
-        .queryParam("client_id", config.getClientId())
-        .queryParam("client_secret", config.getClientSecret())
-        .queryParam("redirect_uri", config.getCallbackUri())
-        .queryParam("code", code)
-        .build()
-        .toUriString();
+    MultiValueMap<String, String> tokenForm = new LinkedMultiValueMap<>();
+    tokenForm.add("grant_type", "authorization_code");
+    tokenForm.add("code_verifier", codeVerifier);
+    tokenForm.add("redirect_uri", config.getCallbackUri());
+    tokenForm.add("code", request.code().trim());
+    tokenForm.add("client_id", config.getClientId());
+    tokenForm.add("device_id", deviceId);
+    if (StringUtils.hasText(state)) {
+      tokenForm.add("state", state);
+    }
 
     VkTokenResponse tokenResponse;
     try {
-      tokenResponse = restClient.get()
-          .uri(tokenRequestUri)
+      tokenResponse = restClient.post()
+          .uri(VK_TOKEN_ENDPOINT)
+          .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+          .body(tokenForm)
           .retrieve()
           .body(VkTokenResponse.class);
     } catch (RestClientException ex) {
@@ -261,13 +272,32 @@ public class DomainUserSocialAuthService {
       throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "VK token response is invalid");
     }
 
-    String subject = String.valueOf(tokenResponse.userId());
-    String email = normalizeEmail(tokenResponse.email());
+    MultiValueMap<String, String> userInfoForm = new LinkedMultiValueMap<>();
+    userInfoForm.add("client_id", config.getClientId());
+    userInfoForm.add("access_token", tokenResponse.accessToken());
 
-    String vkProfileUserId = resolveVkProfileUserId(config.getDomain().getId(), tokenResponse);
-    if (StringUtils.hasText(vkProfileUserId)) {
-      subject = vkProfileUserId;
+    VkUserInfoResponse userInfoResponse;
+    try {
+      userInfoResponse = restClient.post()
+          .uri(VK_USERINFO_ENDPOINT)
+          .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+          .body(userInfoForm)
+          .retrieve()
+          .body(VkUserInfoResponse.class);
+    } catch (RestClientException ex) {
+      log.warn("VK userinfo failed domainId={} reason={}", config.getDomain().getId(), ex.getMessage());
+      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Failed to resolve VK user profile");
     }
+
+    Long subjectUserId = tokenResponse.userId();
+    String email = null;
+    if (userInfoResponse != null && userInfoResponse.user() != null) {
+      if (userInfoResponse.user().userId() != null) {
+        subjectUserId = userInfoResponse.user().userId();
+      }
+      email = normalizeEmail(userInfoResponse.user().email());
+    }
+    String subject = String.valueOf(subjectUserId);
 
     if (!StringUtils.hasText(email)) {
       throw new ResponseStatusException(
@@ -277,41 +307,6 @@ public class DomainUserSocialAuthService {
 
     return new SocialPrincipal(subject, email, true);
   }
-
-  private String resolveVkProfileUserId(Long domainId, VkTokenResponse tokenResponse) {
-    String usersUri = UriComponentsBuilder.fromUriString(VK_USERINFO_ENDPOINT)
-        .queryParam("user_ids", tokenResponse.userId())
-        .queryParam("access_token", tokenResponse.accessToken())
-        .queryParam("v", VK_API_VERSION)
-        .build()
-        .toUriString();
-
-    VkUsersResponse usersResponse;
-    try {
-      usersResponse = restClient.get()
-          .uri(usersUri)
-          .retrieve()
-          .body(VkUsersResponse.class);
-    } catch (RestClientException ex) {
-      log.warn("VK userinfo failed domainId={} reason={}", domainId, ex.getMessage());
-      return null;
-    }
-
-    if (usersResponse == null || usersResponse.response() == null || usersResponse.response().isEmpty()) {
-      if (usersResponse != null && usersResponse.error() != null) {
-        log.warn(
-            "VK userinfo returned API error domainId={} code={} message={}",
-            domainId,
-            usersResponse.error().errorCode(),
-            usersResponse.error().errorMsg());
-      }
-      return null;
-    }
-
-    VkUserInfo first = usersResponse.response().getFirst();
-    return first == null || first.id() == null ? null : String.valueOf(first.id());
-  }
-
   private void requireProviderConfig(DomainSocialProviderConfig config, String message) {
     if (!StringUtils.hasText(config.getClientId())
         || !StringUtils.hasText(config.getClientSecret())
@@ -447,28 +442,22 @@ public class DomainUserSocialAuthService {
   private record VkTokenResponse(
       @com.fasterxml.jackson.annotation.JsonProperty("access_token")
       String accessToken,
+      @com.fasterxml.jackson.annotation.JsonProperty("id_token")
+      String idToken,
       @com.fasterxml.jackson.annotation.JsonProperty("user_id")
-      Long userId,
-      String email
+      Long userId
   ) {
   }
 
-  private record VkUsersResponse(
-      List<VkUserInfo> response,
-      VkApiError error
+  private record VkUserInfoResponse(
+      VkUserInfo user
   ) {
   }
 
   private record VkUserInfo(
-      Long id
-  ) {
-  }
-
-  private record VkApiError(
-      @com.fasterxml.jackson.annotation.JsonProperty("error_code")
-      Integer errorCode,
-      @com.fasterxml.jackson.annotation.JsonProperty("error_msg")
-      String errorMsg
+      @com.fasterxml.jackson.annotation.JsonProperty("user_id")
+      Long userId,
+      String email
   ) {
   }
 }

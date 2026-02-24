@@ -4,6 +4,9 @@ import jakarta.validation.constraints.NotBlank;
 
 public record OwnerSocialAuthRequest(
     @NotBlank String provider,
-    @NotBlank String code
+    @NotBlank String code,
+    String codeVerifier,
+    String deviceId,
+    String state
 ) {
 }
