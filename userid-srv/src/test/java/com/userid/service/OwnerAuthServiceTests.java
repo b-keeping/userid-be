@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 
 import com.userid.api.auth.OwnerLoginRequestDTO;
 import com.userid.api.auth.OwnerRegisterRequestDTO;
+import com.userid.api.client.SocialProviderOAuthClient;
 import com.userid.api.owner.OwnerResponseDTO;
 import com.userid.dal.entity.OwnerEntity;
 import com.userid.dal.entity.OwnerRoleEnum;
@@ -42,6 +43,8 @@ class OwnerAuthServiceTests {
   private EmailService emailService;
   @Mock
   private OwnerOtpService ownerOtpService;
+  @Mock
+  private SocialProviderOAuthClient socialProviderOAuthClient;
 
   private OwnerAuthService ownerAuthService;
 
@@ -68,7 +71,8 @@ class OwnerAuthServiceTests {
         false,
         "",
         "",
-        "");
+        "",
+        socialProviderOAuthClient);
   }
 
   @Test
