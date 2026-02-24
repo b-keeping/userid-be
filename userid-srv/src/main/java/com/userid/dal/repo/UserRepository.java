@@ -1,15 +1,15 @@
 package com.userid.dal.repo;
 
-import com.userid.dal.entity.User;
+import com.userid.dal.entity.UserEntity;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface UserRepository extends JpaRepository<User, Long>, UserRepositoryCustom {
-  Optional<User> findByIdAndDomainId(Long id, Long domainId);
+public interface UserRepository extends JpaRepository<UserEntity, Long>, UserRepositoryCustom {
+  Optional<UserEntity> findByIdAndDomainId(Long id, Long domainId);
 
-  Optional<User> findByDomainIdAndEmail(Long domainId, String email);
+  Optional<UserEntity> findByDomainIdAndEmail(Long domainId, String email);
 
-  Optional<User> findByDomainIdAndEmailPending(Long domainId, String emailPending);
+  Optional<UserEntity> findByDomainIdAndEmailPending(Long domainId, String emailPending);
 
   boolean existsByDomainIdAndEmail(Long domainId, String email);
 }

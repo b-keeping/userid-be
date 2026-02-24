@@ -1,9 +1,9 @@
 package com.userid.dal.repo;
 
-import com.userid.dal.entity.User;
-import com.userid.service.UserSearchFilter;
+import com.userid.dal.entity.UserEntity;
+import com.userid.service.UserSearchFilterDTO;
 import java.util.List;
 
 public interface UserRepositoryCustom {
-  List<User> searchByDomainAndFilters(Long domainId, List<UserSearchFilter> filters);
+  List<UserEntity> searchByDomainAndFilters(Long domainId, List<UserSearchFilterDTO> filters);
 }

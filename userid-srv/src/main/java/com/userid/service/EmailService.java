@@ -1,6 +1,6 @@
 package com.userid.service;
 
-import com.userid.dal.entity.Domain;
+import com.userid.dal.entity.DomainEntity;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Properties;
@@ -104,17 +104,17 @@ public class EmailService {
     mailSender.send(message);
   }
 
-  public void sendOtpEmail(Domain domain, String to, String code) {
+  public void sendOtpEmail(DomainEntity domain, String to, String code) {
     String link = buildDomainLink(domain, userVerifyPath, code);
     sendWithDomain(domain, to, "Подтверждение регистрации", "Для подтверждения регистрации перейдите по ссылке:\n" + link);
   }
 
-  public void sendUserPasswordResetCode(Domain domain, String to, String code) {
+  public void sendUserPasswordResetCode(DomainEntity domain, String to, String code) {
     String link = buildDomainLink(domain, userResetPath, code);
     sendWithDomain(domain, to, "Сброс пароля", "Для сброса пароля перейдите по ссылке:\n" + link);
   }
 
-  private void sendWithDomain(Domain domain, String to, String subject, String text) {
+  private void sendWithDomain(DomainEntity domain, String to, String subject, String text) {
     SimpleMailMessage message = new SimpleMailMessage();
     message.setTo(to);
     String from = buildFromAddress(domain);
@@ -159,14 +159,14 @@ public class EmailService {
     }
   }
 
-  private String buildFromAddress(Domain domain) {
+  private String buildFromAddress(DomainEntity domain) {
     if (domain == null || domain.getName() == null || domain.getName().isBlank()) {
       return fromAddress;
     }
     return domainFromLocalPart + "@" + domain.getName();
   }
 
-  private String buildDomainLink(Domain domain, String path, String code) {
+  private String buildDomainLink(DomainEntity domain, String path, String code) {
     if (domain == null || domain.getName() == null || domain.getName().isBlank()) {
       return null;
     }
@@ -180,7 +180,7 @@ public class EmailService {
     return base + normalizedPath + separator + "code=" + encoded;
   }
 
-  private JavaMailSender resolveSender(Domain domain) {
+  private JavaMailSender resolveSender(DomainEntity domain) {
     if (domain == null) {
       return mailSender;
     }

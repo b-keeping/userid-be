@@ -1,10 +1,10 @@
 package com.userid.service;
 
-import com.userid.api.domain.ProfileFieldRequest;
-import com.userid.api.domain.ProfileFieldResponse;
-import com.userid.api.domain.ProfileFieldUpdateRequest;
-import com.userid.dal.entity.Domain;
-import com.userid.dal.entity.ProfileField;
+import com.userid.api.domain.ProfileFieldRequestDTO;
+import com.userid.api.domain.ProfileFieldResponseDTO;
+import com.userid.api.domain.ProfileFieldUpdateRequestDTO;
+import com.userid.dal.entity.DomainEntity;
+import com.userid.dal.entity.ProfileFieldEntity;
 import com.userid.dal.repo.DomainRepository;
 import com.userid.dal.repo.ProfileFieldRepository;
 import com.userid.dal.repo.UserProfileValueRepository;
@@ -25,9 +25,9 @@ public class ProfileFieldService {
   private final UserProfileValueRepository userProfileValueRepository;
   private final AccessService accessService;
 
-  public ProfileFieldResponse create(Long serviceUserId, Long domainId, ProfileFieldRequest request) {
+  public ProfileFieldResponseDTO create(Long serviceUserId, Long domainId, ProfileFieldRequestDTO request) {
     accessService.requireDomainAccess(serviceUserId, domainId);
-    Domain domain = domainRepository.findById(domainId)
+    DomainEntity domain = domainRepository.findById(domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found"));
 
     profileFieldRepository.findByDomainIdAndName(domainId, request.name())
@@ -35,7 +35,7 @@ public class ProfileFieldService {
           throw new ResponseStatusException(HttpStatus.CONFLICT, "Field name already exists for domain");
         });
 
-    ProfileField field = ProfileField.builder()
+    ProfileFieldEntity field = ProfileFieldEntity.builder()
         .domain(domain)
         .name(request.name())
         .type(request.type())
@@ -43,32 +43,32 @@ public class ProfileFieldService {
         .sortOrder(request.sortOrder())
         .build();
 
-    ProfileField saved = profileFieldRepository.save(field);
+    ProfileFieldEntity saved = profileFieldRepository.save(field);
     return toResponse(saved);
   }
 
-  public List<ProfileFieldResponse> list(Long serviceUserId, Long domainId) {
+  public List<ProfileFieldResponseDTO> list(Long serviceUserId, Long domainId) {
     accessService.requireDomainAccess(serviceUserId, domainId);
     if (!domainRepository.existsById(domainId)) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found");
     }
-    List<ProfileField> fields = profileFieldRepository.findByDomainId(domainId);
+    List<ProfileFieldEntity> fields = profileFieldRepository.findByDomainId(domainId);
     return fields.stream()
         .sorted(Comparator
-            .comparing(ProfileField::getSortOrder, Comparator.nullsLast(Integer::compareTo))
-            .thenComparing(ProfileField::getId))
+            .comparing(ProfileFieldEntity::getSortOrder, Comparator.nullsLast(Integer::compareTo))
+            .thenComparing(ProfileFieldEntity::getId))
         .map(this::toResponse)
         .collect(Collectors.toList());
   }
 
-  public ProfileFieldResponse update(
+  public ProfileFieldResponseDTO update(
       Long serviceUserId,
       Long domainId,
       Long fieldId,
-      ProfileFieldUpdateRequest request
+      ProfileFieldUpdateRequestDTO request
   ) {
     accessService.requireDomainAccess(serviceUserId, domainId);
-    ProfileField field = profileFieldRepository.findByIdAndDomainId(fieldId, domainId)
+    ProfileFieldEntity field = profileFieldRepository.findByIdAndDomainId(fieldId, domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile field not found"));
 
     if (request.name() != null && !request.name().isBlank() && !request.name().equals(field.getName())) {
@@ -97,21 +97,21 @@ public class ProfileFieldService {
       field.setSortOrder(request.sortOrder());
     }
 
-    ProfileField saved = profileFieldRepository.save(field);
+    ProfileFieldEntity saved = profileFieldRepository.save(field);
     return toResponse(saved);
   }
 
   @Transactional
   public void delete(Long serviceUserId, Long domainId, Long fieldId) {
     accessService.requireDomainAccess(serviceUserId, domainId);
-    ProfileField field = profileFieldRepository.findByIdAndDomainId(fieldId, domainId)
+    ProfileFieldEntity field = profileFieldRepository.findByIdAndDomainId(fieldId, domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile field not found"));
     userProfileValueRepository.deleteByFieldId(field.getId());
     profileFieldRepository.delete(field);
   }
 
-  private ProfileFieldResponse toResponse(ProfileField field) {
-    return new ProfileFieldResponse(
+  private ProfileFieldResponseDTO toResponse(ProfileFieldEntity field) {
+    return new ProfileFieldResponseDTO(
         field.getId(),
         field.getName(),
         field.getType(),

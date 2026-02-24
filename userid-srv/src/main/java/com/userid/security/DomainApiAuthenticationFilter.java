@@ -50,7 +50,7 @@ public class DomainApiAuthenticationFilter extends OncePerRequestFilter {
     String token = header.substring(7).trim();
     if (!token.isEmpty()) {
       try {
-        DomainApiPrincipal principal = domainApiJwtService.parseToken(token);
+        DomainApiPrincipalDTO principal = domainApiJwtService.parseToken(token);
         var authorities = List.of(new SimpleGrantedAuthority("ROLE_DOMAIN_API"));
         var authentication = new UsernamePasswordAuthenticationToken(principal, token, authorities);
         SecurityContextHolder.getContext().setAuthentication(authentication);

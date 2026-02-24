@@ -1,7 +1,7 @@
 package com.userid.api.domain;
 
-import com.userid.api.common.ApiMessage;
-import com.userid.security.AuthPrincipal;
+import com.userid.api.common.ApiMessageDTO;
+import com.userid.security.AuthPrincipalDTO;
 import com.userid.service.ProfileFieldService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -23,39 +23,39 @@ public class ProfileFieldController {
   private final ProfileFieldService profileFieldService;
 
   @PostMapping
-  public ProfileFieldResponse create(
-      @AuthenticationPrincipal AuthPrincipal principal,
+  public ProfileFieldResponseDTO create(
+      @AuthenticationPrincipal AuthPrincipalDTO principal,
       @PathVariable Long domainId,
-      @Valid @RequestBody ProfileFieldRequest request
+      @Valid @RequestBody ProfileFieldRequestDTO request
   ) {
     return profileFieldService.create(principal.id(), domainId, request);
   }
 
   @GetMapping
-  public List<ProfileFieldResponse> list(
-      @AuthenticationPrincipal AuthPrincipal principal,
+  public List<ProfileFieldResponseDTO> list(
+      @AuthenticationPrincipal AuthPrincipalDTO principal,
       @PathVariable Long domainId
   ) {
     return profileFieldService.list(principal.id(), domainId);
   }
 
   @PutMapping("/{fieldId}")
-  public ProfileFieldResponse update(
-      @AuthenticationPrincipal AuthPrincipal principal,
+  public ProfileFieldResponseDTO update(
+      @AuthenticationPrincipal AuthPrincipalDTO principal,
       @PathVariable Long domainId,
       @PathVariable Long fieldId,
-      @RequestBody ProfileFieldUpdateRequest request
+      @RequestBody ProfileFieldUpdateRequestDTO request
   ) {
     return profileFieldService.update(principal.id(), domainId, fieldId, request);
   }
 
   @DeleteMapping("/{fieldId}")
-  public ApiMessage delete(
-      @AuthenticationPrincipal AuthPrincipal principal,
+  public ApiMessageDTO delete(
+      @AuthenticationPrincipal AuthPrincipalDTO principal,
       @PathVariable Long domainId,
       @PathVariable Long fieldId
   ) {
     profileFieldService.delete(principal.id(), domainId, fieldId);
-    return new ApiMessage("ok");
+    return new ApiMessageDTO("ok");
   }
 }

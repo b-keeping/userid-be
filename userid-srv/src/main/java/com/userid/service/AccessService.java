@@ -1,7 +1,7 @@
 package com.userid.service;
 
-import com.userid.dal.entity.Owner;
-import com.userid.dal.entity.OwnerRole;
+import com.userid.dal.entity.OwnerEntity;
+import com.userid.dal.entity.OwnerRoleEnum;
 import com.userid.dal.repo.OwnerDomainRepository;
 import com.userid.dal.repo.OwnerRepository;
 import java.util.stream.Collectors;
@@ -16,7 +16,7 @@ public class AccessService {
   private final OwnerRepository ownerRepository;
   private final OwnerDomainRepository ownerDomainRepository;
 
-  public Owner requireUser(Long ownerId) {
+  public OwnerEntity requireUser(Long ownerId) {
     if (ownerId == null) {
       throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing owner id");
     }
@@ -24,17 +24,17 @@ public class AccessService {
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Owner not found"));
   }
 
-  public Owner requireAdmin(Long ownerId) {
-    Owner user = requireUser(ownerId);
-    if (user.getRole() != OwnerRole.ADMIN) {
+  public OwnerEntity requireAdmin(Long ownerId) {
+    OwnerEntity user = requireUser(ownerId);
+    if (user.getRole() != OwnerRoleEnum.ADMIN) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin access required");
     }
     return user;
   }
 
-  public Owner requireDomainAccess(Long ownerId, Long domainId) {
-    Owner user = requireUser(ownerId);
-    if (user.getRole() == OwnerRole.ADMIN) {
+  public OwnerEntity requireDomainAccess(Long ownerId, Long domainId) {
+    OwnerEntity user = requireUser(ownerId);
+    if (user.getRole() == OwnerRoleEnum.ADMIN) {
       return user;
     }
     boolean hasAccess = ownerDomainRepository.findByOwnerId(ownerId).stream()

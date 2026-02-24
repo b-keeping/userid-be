@@ -1,14 +1,14 @@
 package com.userid.dal.repo;
 
-import com.userid.api.client.AuthServerSocialProvider;
-import com.userid.dal.entity.UserSocialIdentity;
+import com.userid.api.client.AuthServerSocialProviderEnum;
+import com.userid.dal.entity.UserSocialIdentityEntity;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface UserSocialIdentityRepository extends JpaRepository<UserSocialIdentity, Long> {
-  Optional<UserSocialIdentity> findByDomainIdAndProviderAndProviderSubject(
+public interface UserSocialIdentityRepository extends JpaRepository<UserSocialIdentityEntity, Long> {
+  Optional<UserSocialIdentityEntity> findByDomainIdAndProviderAndProviderSubject(
       Long domainId,
-      AuthServerSocialProvider provider,
+      AuthServerSocialProviderEnum provider,
       String providerSubject
   );
 

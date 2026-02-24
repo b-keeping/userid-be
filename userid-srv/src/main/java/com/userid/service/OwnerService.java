@@ -1,13 +1,13 @@
 package com.userid.service;
 
-import com.userid.api.owner.OwnerDomainRequest;
-import com.userid.api.owner.OwnerRequest;
-import com.userid.api.owner.OwnerResponse;
-import com.userid.api.owner.OwnerUpdateRequest;
-import com.userid.dal.entity.Domain;
-import com.userid.dal.entity.Owner;
-import com.userid.dal.entity.OwnerDomain;
-import com.userid.dal.entity.OwnerRole;
+import com.userid.api.owner.OwnerDomainRequestDTO;
+import com.userid.api.owner.OwnerRequestDTO;
+import com.userid.api.owner.OwnerResponseDTO;
+import com.userid.api.owner.OwnerUpdateRequestDTO;
+import com.userid.dal.entity.DomainEntity;
+import com.userid.dal.entity.OwnerEntity;
+import com.userid.dal.entity.OwnerDomainEntity;
+import com.userid.dal.entity.OwnerRoleEnum;
 import com.userid.dal.repo.DomainRepository;
 import com.userid.dal.repo.OwnerDomainRepository;
 import com.userid.dal.repo.OwnerRepository;
@@ -38,7 +38,7 @@ public class OwnerService {
   private final PasswordEncoder passwordEncoder;
   private final OwnerOtpService ownerOtpService;
 
-  public OwnerResponse create(Long ownerId, OwnerRequest request) {
+  public OwnerResponseDTO create(Long ownerId, OwnerRequestDTO request) {
     accessService.requireAdmin(ownerId);
     String email = normalizeEmail(request.email());
 
@@ -48,14 +48,14 @@ public class OwnerService {
         });
 
     List<Long> domainIds = request.domainIds() == null ? List.of() : request.domainIds();
-    List<Domain> domains = List.of();
-    if (request.role() == OwnerRole.USER && !domainIds.isEmpty()) {
+    List<DomainEntity> domains = List.of();
+    if (request.role() == OwnerRoleEnum.USER && !domainIds.isEmpty()) {
       domains = resolveDomains(domainIds);
     }
 
     String password = requirePassword(request.password());
 
-    Owner user = Owner.builder()
+    OwnerEntity user = OwnerEntity.builder()
         .email(email)
         .passwordHash(passwordEncoder.encode(password))
         .role(request.role())
@@ -64,44 +64,44 @@ public class OwnerService {
         .emailVerifiedAt(OffsetDateTime.now(ZoneOffset.UTC))
         .build();
 
-    Owner saved = ownerRepository.save(user);
+    OwnerEntity saved = ownerRepository.save(user);
 
-    if (request.role() == OwnerRole.USER && !domains.isEmpty()) {
+    if (request.role() == OwnerRoleEnum.USER && !domains.isEmpty()) {
       linkDomains(saved, domains);
     }
 
     return toResponse(saved);
   }
 
-  public List<OwnerResponse> list(Long ownerId) {
+  public List<OwnerResponseDTO> list(Long ownerId) {
     accessService.requireAdmin(ownerId);
     return ownerRepository.findAll().stream()
         .map(this::toResponse)
         .collect(Collectors.toList());
   }
 
-  public OwnerResponse get(Long ownerId, Long targetUserId) {
-    Owner requester = accessService.requireUser(ownerId);
-    if (requester.getRole() != OwnerRole.ADMIN && !requester.getId().equals(targetUserId)) {
+  public OwnerResponseDTO get(Long ownerId, Long targetUserId) {
+    OwnerEntity requester = accessService.requireUser(ownerId);
+    if (requester.getRole() != OwnerRoleEnum.ADMIN && !requester.getId().equals(targetUserId)) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied");
     }
-    Owner user = ownerRepository.findById(targetUserId)
+    OwnerEntity user = ownerRepository.findById(targetUserId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Owner not found"));
     return toResponse(user);
   }
 
-  public OwnerResponse addDomain(Long ownerId, Long targetUserId, OwnerDomainRequest request) {
+  public OwnerResponseDTO addDomain(Long ownerId, Long targetUserId, OwnerDomainRequestDTO request) {
     accessService.requireAdmin(ownerId);
 
-    Owner user = ownerRepository.findById(targetUserId)
+    OwnerEntity user = ownerRepository.findById(targetUserId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Owner not found"));
 
-    if (user.getRole() != OwnerRole.USER) {
+    if (user.getRole() != OwnerRoleEnum.USER) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only USER can be linked to domains");
     }
 
     Long domainId = request.domainId();
-    Domain domain = domainRepository.findById(domainId)
+    DomainEntity domain = domainRepository.findById(domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found"));
 
     if (ownerDomainRepository.existsByDomainIdAndOwnerIdNot(domainId, user.getId())) {
@@ -109,7 +109,7 @@ public class OwnerService {
     }
 
     if (!ownerDomainRepository.existsByOwnerIdAndDomainId(user.getId(), domainId)) {
-      OwnerDomain link = OwnerDomain.builder()
+      OwnerDomainEntity link = OwnerDomainEntity.builder()
           .owner(user)
           .domain(domain)
           .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
@@ -120,9 +120,9 @@ public class OwnerService {
     return toResponse(user);
   }
 
-  public OwnerResponse update(Long ownerId, Long targetUserId, OwnerUpdateRequest request) {
+  public OwnerResponseDTO update(Long ownerId, Long targetUserId, OwnerUpdateRequestDTO request) {
     accessService.requireAdmin(ownerId);
-    Owner user = ownerRepository.findById(targetUserId)
+    OwnerEntity user = ownerRepository.findById(targetUserId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Owner not found"));
 
     if (request.email() != null && !request.email().isBlank()
@@ -138,12 +138,12 @@ public class OwnerService {
       user.setPasswordHash(passwordEncoder.encode(request.password()));
     }
 
-    OwnerRole previousRole = user.getRole();
-    OwnerRole targetRole = request.role() != null ? request.role() : previousRole;
+    OwnerRoleEnum previousRole = user.getRole();
+    OwnerRoleEnum targetRole = request.role() != null ? request.role() : previousRole;
     user.setRole(targetRole);
 
-    if (targetRole == OwnerRole.ADMIN) {
-      if (previousRole == OwnerRole.USER) {
+    if (targetRole == OwnerRoleEnum.ADMIN) {
+      if (previousRole == OwnerRoleEnum.USER) {
         ensureDomainsHaveOtherOwners(user.getId(), currentDomainIds(user.getId()));
         ownerDomainRepository.deleteByOwnerId(user.getId());
       }
@@ -156,25 +156,25 @@ public class OwnerService {
             .distinct()
             .toList();
         ensureDomainsHaveOtherOwners(user.getId(), removed);
-        List<Domain> domains = domainIds.isEmpty() ? List.of() : resolveDomains(domainIds);
+        List<DomainEntity> domains = domainIds.isEmpty() ? List.of() : resolveDomains(domainIds);
         ownerDomainRepository.deleteByOwnerId(user.getId());
         if (!domains.isEmpty()) {
           linkDomains(user, domains);
         }
-      } else if (previousRole == OwnerRole.USER) {
+      } else if (previousRole == OwnerRoleEnum.USER) {
         // keep existing links
       }
     }
 
-    Owner saved = ownerRepository.save(user);
+    OwnerEntity saved = ownerRepository.save(user);
     return toResponse(saved);
   }
 
   public void removeDomain(Long ownerId, Long targetUserId, Long domainId) {
     accessService.requireAdmin(ownerId);
-    Owner user = ownerRepository.findById(targetUserId)
+    OwnerEntity user = ownerRepository.findById(targetUserId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Owner not found"));
-    if (user.getRole() != OwnerRole.USER) {
+    if (user.getRole() != OwnerRoleEnum.USER) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only USER can be linked to domains");
     }
     ensureDomainsHaveOtherOwners(user.getId(), List.of(domainId));
@@ -184,7 +184,7 @@ public class OwnerService {
   @Transactional
   public void delete(Long ownerId, Long targetUserId) {
     accessService.requireAdmin(ownerId);
-    Owner user = ownerRepository.findById(targetUserId)
+    OwnerEntity user = ownerRepository.findById(targetUserId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Owner not found"));
     ensureDomainsHaveOtherOwners(user.getId(), currentDomainIds(user.getId()));
     ownerOtpService.clearAllCodes(user);
@@ -193,10 +193,10 @@ public class OwnerService {
     ownerRepository.delete(user);
   }
 
-  private List<Domain> resolveDomains(List<Long> domainIds) {
-    List<Domain> domains = domainRepository.findAllById(domainIds);
+  private List<DomainEntity> resolveDomains(List<Long> domainIds) {
+    List<DomainEntity> domains = domainRepository.findAllById(domainIds);
     if (domains.size() != domainIds.size()) {
-      Set<Long> foundIds = domains.stream().map(Domain::getId).collect(Collectors.toSet());
+      Set<Long> foundIds = domains.stream().map(DomainEntity::getId).collect(Collectors.toSet());
       List<Long> missing = domainIds.stream()
           .filter(id -> !foundIds.contains(id))
           .toList();
@@ -205,10 +205,10 @@ public class OwnerService {
     return domains;
   }
 
-  private void linkDomains(Owner user, List<Domain> domains) {
-    List<OwnerDomain> links = new ArrayList<>();
-    for (Domain domain : domains) {
-      OwnerDomain link = OwnerDomain.builder()
+  private void linkDomains(OwnerEntity user, List<DomainEntity> domains) {
+    List<OwnerDomainEntity> links = new ArrayList<>();
+    for (DomainEntity domain : domains) {
+      OwnerDomainEntity link = OwnerDomainEntity.builder()
           .owner(user)
           .domain(domain)
           .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
@@ -218,9 +218,9 @@ public class OwnerService {
     ownerDomainRepository.saveAll(links);
   }
 
-  private OwnerResponse toResponse(Owner user) {
+  private OwnerResponseDTO toResponse(OwnerEntity user) {
     List<Long> domainIds;
-    if (user.getRole() == OwnerRole.ADMIN) {
+    if (user.getRole() == OwnerRoleEnum.ADMIN) {
       domainIds = Collections.emptyList();
     } else {
       domainIds = ownerDomainRepository.findByOwnerId(user.getId()).stream()
@@ -229,7 +229,7 @@ public class OwnerService {
           .collect(Collectors.toList());
     }
 
-    return new OwnerResponse(
+    return new OwnerResponseDTO(
         user.getId(),
         user.getEmail(),
         user.getRole(),
@@ -249,7 +249,7 @@ public class OwnerService {
     for (Long domainId : domainIds) {
       long remaining = ownerDomainRepository.countByDomainIdAndOwnerRoleAndOwnerIdNot(
           domainId,
-          OwnerRole.USER,
+          OwnerRoleEnum.USER,
           userId
       );
       if (remaining == 0) {

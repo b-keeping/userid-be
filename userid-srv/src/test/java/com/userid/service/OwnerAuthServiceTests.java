@@ -6,11 +6,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.userid.api.auth.OwnerLoginRequest;
-import com.userid.api.auth.OwnerRegisterRequest;
-import com.userid.api.owner.OwnerResponse;
-import com.userid.dal.entity.Owner;
-import com.userid.dal.entity.OwnerRole;
+import com.userid.api.auth.OwnerLoginRequestDTO;
+import com.userid.api.auth.OwnerRegisterRequestDTO;
+import com.userid.api.owner.OwnerResponseDTO;
+import com.userid.dal.entity.OwnerEntity;
+import com.userid.dal.entity.OwnerRoleEnum;
 import com.userid.dal.repo.OwnerDomainRepository;
 import com.userid.dal.repo.OwnerRepository;
 import com.userid.dal.repo.OwnerSocialIdentityRepository;
@@ -73,11 +73,11 @@ class OwnerAuthServiceTests {
 
   @Test
   void loginWhenOwnerEmailNotConfirmedResendsVerificationAndReturnsUnauthorized() {
-    Owner owner = Owner.builder()
+    OwnerEntity owner = OwnerEntity.builder()
         .id(7L)
         .email("owner@identio.ru")
         .passwordHash("hash")
-        .role(OwnerRole.USER)
+        .role(OwnerRoleEnum.USER)
         .createdAt(OffsetDateTime.now())
         .active(false)
         .build();
@@ -86,7 +86,7 @@ class OwnerAuthServiceTests {
     when(passwordEncoder.matches("secret", "hash")).thenReturn(true);
     when(ownerOtpService.createVerificationCode(owner)).thenReturn("verify-code");
 
-    assertThatThrownBy(() -> ownerAuthService.login(new OwnerLoginRequest("owner@identio.ru", "secret")))
+    assertThatThrownBy(() -> ownerAuthService.login(new OwnerLoginRequestDTO("owner@identio.ru", "secret")))
         .isInstanceOfSatisfying(
             ResponseStatusException.class,
             ex -> {
@@ -103,11 +103,11 @@ class OwnerAuthServiceTests {
 
   @Test
   void registerWhenOwnerExistsAndUnconfirmedOverridesPasswordAndResendsActivationEmail() {
-    Owner existing = Owner.builder()
+    OwnerEntity existing = OwnerEntity.builder()
         .id(11L)
         .email("owner@identio.ru")
         .passwordHash("old-hash")
-        .role(OwnerRole.USER)
+        .role(OwnerRoleEnum.USER)
         .createdAt(OffsetDateTime.now())
         .active(false)
         .emailVerifiedAt(OffsetDateTime.now())
@@ -119,7 +119,7 @@ class OwnerAuthServiceTests {
     when(ownerOtpService.createVerificationCode(existing)).thenReturn("verify-code");
     when(ownerDomainRepository.findByOwnerId(11L)).thenReturn(java.util.List.of());
 
-    OwnerResponse response = ownerAuthService.register(new OwnerRegisterRequest("owner@identio.ru", "new-secret"));
+    OwnerResponseDTO response = ownerAuthService.register(new OwnerRegisterRequestDTO("owner@identio.ru", "new-secret"));
 
     assertThat(response.id()).isEqualTo(11L);
     assertThat(existing.getPasswordHash()).isEqualTo("new-hash");
@@ -134,11 +134,11 @@ class OwnerAuthServiceTests {
 
   @Test
   void registerWhenOwnerExistsAndActiveAndPasswordMatchesReturnsSuccess() {
-    Owner existing = Owner.builder()
+    OwnerEntity existing = OwnerEntity.builder()
         .id(12L)
         .email("owner@identio.ru")
         .passwordHash("hash")
-        .role(OwnerRole.USER)
+        .role(OwnerRoleEnum.USER)
         .createdAt(OffsetDateTime.now())
         .active(true)
         .emailVerifiedAt(OffsetDateTime.now())
@@ -148,7 +148,7 @@ class OwnerAuthServiceTests {
     when(passwordEncoder.matches("secret", "hash")).thenReturn(true);
     when(ownerDomainRepository.findByOwnerId(12L)).thenReturn(java.util.List.of());
 
-    OwnerResponse response = ownerAuthService.register(new OwnerRegisterRequest("owner@identio.ru", "secret"));
+    OwnerResponseDTO response = ownerAuthService.register(new OwnerRegisterRequestDTO("owner@identio.ru", "secret"));
 
     assertThat(response.id()).isEqualTo(12L);
     verify(ownerOtpService, never()).createResetCode(existing);
@@ -157,11 +157,11 @@ class OwnerAuthServiceTests {
 
   @Test
   void registerWhenOwnerExistsAndActiveAndPasswordMismatchSendsResetEmailAndReturnsSuccess() {
-    Owner existing = Owner.builder()
+    OwnerEntity existing = OwnerEntity.builder()
         .id(13L)
         .email("owner@identio.ru")
         .passwordHash("hash")
-        .role(OwnerRole.USER)
+        .role(OwnerRoleEnum.USER)
         .createdAt(OffsetDateTime.now())
         .active(true)
         .emailVerifiedAt(OffsetDateTime.now())
@@ -173,7 +173,7 @@ class OwnerAuthServiceTests {
     when(ownerRepository.save(existing)).thenReturn(existing);
     when(ownerDomainRepository.findByOwnerId(13L)).thenReturn(java.util.List.of());
 
-    OwnerResponse response = ownerAuthService.register(new OwnerRegisterRequest("owner@identio.ru", "secret"));
+    OwnerResponseDTO response = ownerAuthService.register(new OwnerRegisterRequestDTO("owner@identio.ru", "secret"));
 
     assertThat(response.id()).isEqualTo(13L);
     verify(ownerOtpService).createResetCode(existing);

@@ -1,15 +1,15 @@
 package com.userid.dal.repo;
 
-import com.userid.dal.entity.Owner;
+import com.userid.dal.entity.OwnerEntity;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface OwnerRepository extends JpaRepository<Owner, Long> {
-  Optional<Owner> findByEmail(String email);
+public interface OwnerRepository extends JpaRepository<OwnerEntity, Long> {
+  Optional<OwnerEntity> findByEmail(String email);
 
-  Optional<Owner> findFirstByRole(com.userid.dal.entity.OwnerRole role);
+  Optional<OwnerEntity> findFirstByRole(com.userid.dal.entity.OwnerRoleEnum role);
 
-  boolean existsByRole(com.userid.dal.entity.OwnerRole role);
+  boolean existsByRole(com.userid.dal.entity.OwnerRoleEnum role);
 
   boolean existsByEmail(String email);
 }

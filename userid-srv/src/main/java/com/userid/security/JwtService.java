@@ -1,7 +1,7 @@
 package com.userid.security;
 
-import com.userid.dal.entity.Owner;
-import com.userid.dal.entity.OwnerRole;
+import com.userid.dal.entity.OwnerEntity;
+import com.userid.dal.entity.OwnerRoleEnum;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -30,11 +30,11 @@ public class JwtService {
     this.expiration = Duration.ofMinutes(expirationMinutes);
   }
 
-  public String generateToken(Owner user) {
+  public String generateToken(OwnerEntity user) {
     return generateToken(user, expiration);
   }
 
-  public String generateToken(Owner user, Duration customExpiration) {
+  public String generateToken(OwnerEntity user, Duration customExpiration) {
     Instant now = Instant.now();
     return Jwts.builder()
         .subject(String.valueOf(user.getId()))
@@ -46,7 +46,7 @@ public class JwtService {
         .compact();
   }
 
-  public AuthPrincipal parseToken(String token) throws JwtException {
+  public AuthPrincipalDTO parseToken(String token) throws JwtException {
     Claims claims = Jwts.parser()
         .verifyWith(secretKey)
         .build()
@@ -56,7 +56,7 @@ public class JwtService {
     Long id = Long.valueOf(claims.getSubject());
     String email = claims.get("email", String.class);
     String roleValue = claims.get("role", String.class);
-    OwnerRole role = OwnerRole.valueOf(roleValue);
-    return new AuthPrincipal(id, email, role);
+    OwnerRoleEnum role = OwnerRoleEnum.valueOf(roleValue);
+    return new AuthPrincipalDTO(id, email, role);
   }
 }

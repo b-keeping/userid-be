@@ -12,5 +12,5 @@ public class AuthServerApiProperties {
   private String baseUrl;
   private Long domainId;
   private String apiToken;
-  private UseridApiLanguage language = UseridApiLanguage.EN;
+  private UseridApiLanguageEnum language = UseridApiLanguageEnum.EN;
 }

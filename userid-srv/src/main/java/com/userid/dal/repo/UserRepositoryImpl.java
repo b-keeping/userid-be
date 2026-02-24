@@ -1,9 +1,9 @@
 package com.userid.dal.repo;
 
-import com.userid.dal.entity.ProfileField;
-import com.userid.dal.entity.User;
-import com.userid.dal.entity.UserProfileValue;
-import com.userid.service.UserSearchFilter;
+import com.userid.dal.entity.ProfileFieldEntity;
+import com.userid.dal.entity.UserEntity;
+import com.userid.dal.entity.UserProfileValueEntity;
+import com.userid.service.UserSearchFilterDTO;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.TypedQuery;
@@ -25,18 +25,18 @@ public class UserRepositoryImpl implements UserRepositoryCustom {
   private EntityManager entityManager;
 
   @Override
-  public List<User> searchByDomainAndFilters(Long domainId, List<UserSearchFilter> filters) {
+  public List<UserEntity> searchByDomainAndFilters(Long domainId, List<UserSearchFilterDTO> filters) {
     CriteriaBuilder cb = entityManager.getCriteriaBuilder();
-    CriteriaQuery<User> cq = cb.createQuery(User.class);
-    Root<User> userRoot = cq.from(User.class);
+    CriteriaQuery<UserEntity> cq = cb.createQuery(UserEntity.class);
+    Root<UserEntity> userRoot = cq.from(UserEntity.class);
 
     List<Predicate> predicates = new ArrayList<>();
     predicates.add(cb.equal(userRoot.get("domain").get("id"), domainId));
 
-    for (UserSearchFilter filter : filters) {
+    for (UserSearchFilterDTO filter : filters) {
       Subquery<Long> subquery = cq.subquery(Long.class);
-      Root<UserProfileValue> valueRoot = subquery.from(UserProfileValue.class);
-      Join<UserProfileValue, ProfileField> fieldJoin = valueRoot.join("field", JoinType.INNER);
+      Root<UserProfileValueEntity> valueRoot = subquery.from(UserProfileValueEntity.class);
+      Join<UserProfileValueEntity, ProfileFieldEntity> fieldJoin = valueRoot.join("field", JoinType.INNER);
 
       List<Predicate> subPredicates = new ArrayList<>();
       subPredicates.add(cb.equal(valueRoot.get("user").get("id"), userRoot.get("id")));
@@ -58,7 +58,7 @@ public class UserRepositoryImpl implements UserRepositoryCustom {
 
     cq.select(userRoot).distinct(true).where(predicates.toArray(Predicate[]::new));
 
-    TypedQuery<User> query = entityManager.createQuery(cq);
+    TypedQuery<UserEntity> query = entityManager.createQuery(cq);
     return query.getResultList();
   }
 }

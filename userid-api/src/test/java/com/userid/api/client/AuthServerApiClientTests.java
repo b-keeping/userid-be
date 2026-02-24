@@ -37,7 +37,7 @@ class AuthServerApiClientTests {
     properties.setBaseUrl("https://auth.example.org");
     properties.setDomainId(55L);
     properties.setApiToken("domain-token");
-    properties.setLanguage(UseridApiLanguage.RU);
+    properties.setLanguage(UseridApiLanguageEnum.RU);
     authServerApiClient =
         new AuthServerApiClient(
             restTemplate,
@@ -100,8 +100,8 @@ class AuthServerApiClientTests {
             }
             """, MediaType.APPLICATION_JSON));
 
-    AuthServerLoginResponse response = authServerApiClient.login(
-        new AuthServerLoginRequest("user@example.org", "secret"));
+    AuthServerLoginResponseDTO response = authServerApiClient.login(
+        new AuthServerLoginRequestDTO("user@example.org", "secret"));
 
     server.verify();
     assertThat(response).isNotNull();
@@ -125,9 +125,9 @@ class AuthServerApiClientTests {
 
     authServerApiClient.updateSelf(
         "user-jwt-token",
-        new AuthServerUserSelfUpdateRequest(
+        new AuthServerUserSelfUpdateRequestDTO(
             "new-secret",
-            List.of(AuthServerProfileValue.stringValue(13L, "Имя", "Иван"))));
+            List.of(AuthServerProfileValueDTO.stringValue(13L, "Имя", "Иван"))));
 
     server.verify();
   }
@@ -175,24 +175,24 @@ class AuthServerApiClientTests {
             .contentType(MediaType.APPLICATION_JSON)
             .body("{\"message\":\"Invalid credentials\"}"));
 
-    assertThatThrownBy(() -> authServerApiClient.login(new AuthServerLoginRequest("user@example.org", "bad")))
+    assertThatThrownBy(() -> authServerApiClient.login(new AuthServerLoginRequestDTO("user@example.org", "bad")))
         .isInstanceOf(ResponseStatusException.class)
         .hasMessageContaining(
             "Пользователь с таким email  не зарегистрирован или email не подтвержден или email/пароль не совпадают");
   }
 
-  private AuthServerRegisterRequest registerRequest() {
-    return new AuthServerRegisterRequest(
+  private AuthServerRegisterRequestDTO registerRequest() {
+    return new AuthServerRegisterRequestDTO(
         "user@example.org",
         "secret",
         List.of(
-            AuthServerProfileValue.stringValue(12L, "Фамилия", "Иванов"),
-            AuthServerProfileValue.stringValue(13L, "Имя", "Иван"),
-            AuthServerProfileValue.stringValue(14L, "Отчество.", "Иванович"),
-            AuthServerProfileValue.stringValue(15L, "Паспорт", "AB123456"),
-            AuthServerProfileValue.stringValue(16L, "IDNP", "1234567890123"),
-            AuthServerProfileValue.dateValue(17L, "Дата рождения", LocalDate.of(1990, 1, 15)),
-            AuthServerProfileValue.numericValue(21L, "Телефон", "37360000000")
+            AuthServerProfileValueDTO.stringValue(12L, "Фамилия", "Иванов"),
+            AuthServerProfileValueDTO.stringValue(13L, "Имя", "Иван"),
+            AuthServerProfileValueDTO.stringValue(14L, "Отчество.", "Иванович"),
+            AuthServerProfileValueDTO.stringValue(15L, "Паспорт", "AB123456"),
+            AuthServerProfileValueDTO.stringValue(16L, "IDNP", "1234567890123"),
+            AuthServerProfileValueDTO.dateValue(17L, "Дата рождения", LocalDate.of(1990, 1, 15)),
+            AuthServerProfileValueDTO.numericValue(21L, "Телефон", "37360000000")
         ));
   }
 }

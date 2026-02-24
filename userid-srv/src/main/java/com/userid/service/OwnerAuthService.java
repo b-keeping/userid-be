@@ -1,19 +1,21 @@
 package com.userid.service;
 
-import com.userid.api.auth.OwnerLoginRequest;
-import com.userid.api.auth.OwnerLoginResponse;
-import com.userid.api.auth.OwnerPasswordResetConfirmRequest;
-import com.userid.api.auth.OwnerPasswordResetRequest;
-import com.userid.api.auth.OwnerRegisterRequest;
-import com.userid.api.auth.OwnerSocialAuthRequest;
-import com.userid.api.auth.OwnerSocialProviderConfigResponse;
-import com.userid.api.client.AuthServerSocialProvider;
-import com.userid.api.owner.OwnerResponse;
-import com.userid.dal.entity.Owner;
-import com.userid.dal.entity.OwnerRole;
-import com.userid.dal.entity.OwnerSocialIdentity;
-import com.userid.dal.entity.OtpOwner;
-import com.userid.dal.entity.OtpType;
+import com.userid.api.auth.OwnerLoginRequestDTO;
+import com.userid.api.auth.OwnerLoginResponseDTO;
+import com.userid.api.auth.OwnerPasswordResetConfirmRequestDTO;
+import com.userid.api.auth.OwnerPasswordResetRequestDTO;
+import com.userid.api.auth.OwnerRegisterRequestDTO;
+import com.userid.api.auth.OwnerSocialAuthRequestDTO;
+import com.userid.api.auth.OwnerSocialProviderConfigResponseDTO;
+import com.userid.api.client.AuthServerSocialLoginRequestDTO;
+import com.userid.api.client.AuthServerSocialProviderEnum;
+import com.userid.api.owner.OwnerResponseDTO;
+import com.userid.api.client.SocialProviderOAuthClient;
+import com.userid.dal.entity.OwnerEntity;
+import com.userid.dal.entity.OwnerRoleEnum;
+import com.userid.dal.entity.OwnerSocialIdentityEntity;
+import com.userid.dal.entity.OtpOwnerEntity;
+import com.userid.dal.entity.OtpTypeEnum;
 import com.userid.dal.repo.OwnerDomainRepository;
 import com.userid.dal.repo.OwnerRepository;
 import com.userid.dal.repo.OwnerSocialIdentityRepository;
@@ -29,27 +31,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class OwnerAuthService {
   private static final Logger log = LoggerFactory.getLogger(OwnerAuthService.class);
-  private static final String GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
-  private static final String GOOGLE_USERINFO_ENDPOINT = "https://openidconnect.googleapis.com/v1/userinfo";
-  private static final String YANDEX_TOKEN_ENDPOINT = "https://oauth.yandex.com/token";
-  private static final String YANDEX_USERINFO_ENDPOINT = "https://login.yandex.ru/info?format=json";
-  private static final String VK_TOKEN_ENDPOINT = "https://id.vk.ru/oauth2/auth";
-  private static final String VK_USERINFO_ENDPOINT = "https://id.vk.ru/oauth2/user_info";
 
   private final OwnerRepository ownerRepository;
   private final OwnerDomainRepository ownerDomainRepository;
@@ -72,7 +62,7 @@ public class OwnerAuthService {
   private final String ownerSocialVkClientId;
   private final String ownerSocialVkClientSecret;
   private final String ownerSocialVkCallbackUri;
-  private final RestClient restClient = RestClient.builder().build();
+  private final SocialProviderOAuthClient socialProviderOAuthClient;
 
   public OwnerAuthService(
       OwnerRepository ownerRepository,
@@ -95,7 +85,8 @@ public class OwnerAuthService {
       @Value("${auth.owner-social.vk.enabled:false}") boolean ownerSocialVkEnabled,
       @Value("${auth.owner-social.vk.client-id:}") String ownerSocialVkClientId,
       @Value("${auth.owner-social.vk.client-secret:}") String ownerSocialVkClientSecret,
-      @Value("${auth.owner-social.vk.callback-uri:}") String ownerSocialVkCallbackUri
+      @Value("${auth.owner-social.vk.callback-uri:}") String ownerSocialVkCallbackUri,
+      SocialProviderOAuthClient socialProviderOAuthClient
   ) {
     this.ownerRepository = ownerRepository;
     this.ownerDomainRepository = ownerDomainRepository;
@@ -118,11 +109,12 @@ public class OwnerAuthService {
     this.ownerSocialVkClientId = ownerSocialVkClientId;
     this.ownerSocialVkClientSecret = ownerSocialVkClientSecret;
     this.ownerSocialVkCallbackUri = ownerSocialVkCallbackUri;
+    this.socialProviderOAuthClient = socialProviderOAuthClient;
   }
 
-  public OwnerLoginResponse login(OwnerLoginRequest request) {
+  public OwnerLoginResponseDTO login(OwnerLoginRequestDTO request) {
     String email = normalizeEmail(request.email());
-    Owner user = ownerRepository.findByEmail(email)
+    OwnerEntity user = ownerRepository.findByEmail(email)
         .orElseThrow(this::invalidCredentials);
 
     if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
@@ -134,18 +126,18 @@ public class OwnerAuthService {
     }
 
     String token = jwtService.generateToken(user);
-    return new OwnerLoginResponse(token, toResponse(user));
+    return new OwnerLoginResponseDTO(token, toResponse(user));
   }
 
   @Transactional
-  public OwnerLoginResponse socialLogin(OwnerSocialAuthRequest request) {
+  public OwnerLoginResponseDTO socialLogin(OwnerSocialAuthRequestDTO request) {
     return authenticateWithSocial(request, true);
   }
 
   @Transactional
-  public OwnerResponse register(OwnerRegisterRequest request) {
+  public OwnerResponseDTO register(OwnerRegisterRequestDTO request) {
     String email = normalizeEmail(request.email());
-    Owner existing = ownerRepository.findByEmail(email).orElse(null);
+    OwnerEntity existing = ownerRepository.findByEmail(email).orElse(null);
 
     if (existing != null) {
       if (existing.isActive()) {
@@ -158,35 +150,35 @@ public class OwnerAuthService {
       existing.setPasswordHash(passwordEncoder.encode(request.password()));
       existing.setActive(false);
       existing.setEmailVerifiedAt(null);
-      Owner saved = ownerRepository.save(existing);
+      OwnerEntity saved = ownerRepository.save(existing);
       ownerOtpService.clearResetCode(saved);
       String code = ownerOtpService.createVerificationCode(saved);
       emailService.sendVerificationEmail(saved.getEmail(), buildVerificationLink(code));
       return toResponse(saved);
     }
 
-    Owner user = Owner.builder()
+    OwnerEntity user = OwnerEntity.builder()
         .email(email)
         .passwordHash(passwordEncoder.encode(request.password()))
-        .role(OwnerRole.USER)
+        .role(OwnerRoleEnum.USER)
         .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
         .active(false)
         .build();
 
-    Owner saved = ownerRepository.save(user);
+    OwnerEntity saved = ownerRepository.save(user);
     String code = ownerOtpService.createVerificationCode(saved);
     emailService.sendVerificationEmail(saved.getEmail(), buildVerificationLink(code));
     return toResponse(saved);
   }
 
   @Transactional
-  public OwnerLoginResponse socialRegister(OwnerSocialAuthRequest request) {
+  public OwnerLoginResponseDTO socialRegister(OwnerSocialAuthRequestDTO request) {
     return authenticateWithSocial(request, true);
   }
 
-  public OwnerSocialProviderConfigResponse getSocialProviderConfig(AuthServerSocialProvider provider) {
+  public OwnerSocialProviderConfigResponseDTO getSocialProviderConfig(AuthServerSocialProviderEnum provider) {
     SocialProviderClientConfig config = socialProviderClientConfig(provider);
-    return new OwnerSocialProviderConfigResponse(
+    return new OwnerSocialProviderConfigResponseDTO(
         provider.pathValue(),
         config.isReady(),
         config.clientId(),
@@ -198,8 +190,8 @@ public class OwnerAuthService {
     if (token == null || token.isBlank()) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Token is required");
     }
-    OtpOwner otp = ownerOtpService.requireValid(OtpType.VERIFICATION, token);
-    Owner user = otp.getOwner();
+    OtpOwnerEntity otp = ownerOtpService.requireValid(OtpTypeEnum.VERIFICATION, token);
+    OwnerEntity user = otp.getOwner();
     if (!user.isActive()) {
       user.setActive(true);
       user.setEmailVerifiedAt(OffsetDateTime.now(ZoneOffset.UTC));
@@ -209,9 +201,9 @@ public class OwnerAuthService {
   }
 
   @Transactional
-  public void requestPasswordReset(OwnerPasswordResetRequest request) {
+  public void requestPasswordReset(OwnerPasswordResetRequestDTO request) {
     String email = normalizeEmail(request.email());
-    Owner user = ownerRepository.findByEmail(email)
+    OwnerEntity user = ownerRepository.findByEmail(email)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Email not found"));
 
     if (!user.isActive()) {
@@ -223,9 +215,9 @@ public class OwnerAuthService {
   }
 
   @Transactional
-  public void resetPassword(OwnerPasswordResetConfirmRequest request) {
-    OtpOwner otp = ownerOtpService.requireValid(OtpType.RESET, request.token());
-    Owner user = otp.getOwner();
+  public void resetPassword(OwnerPasswordResetConfirmRequestDTO request) {
+    OtpOwnerEntity otp = ownerOtpService.requireValid(OtpTypeEnum.RESET, request.token());
+    OwnerEntity user = otp.getOwner();
     if (!user.isActive()) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is not confirmed");
     }
@@ -234,33 +226,43 @@ public class OwnerAuthService {
     ownerOtpService.clearResetCode(user);
   }
 
-  private OwnerLoginResponse authenticateWithSocial(OwnerSocialAuthRequest request, boolean allowCreate) {
+  private OwnerLoginResponseDTO authenticateWithSocial(OwnerSocialAuthRequestDTO request, boolean allowCreate) {
     if (request == null || !StringUtils.hasText(request.provider()) || !StringUtils.hasText(request.code())) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Social provider and code are required");
     }
 
-    AuthServerSocialProvider provider = parseProvider(request.provider());
-    SocialProviderClientConfig providerConfig = socialProviderClientConfig(provider);
+    AuthServerSocialProviderEnum provider = parseProvider(request.provider());
+    SocialProviderClientConfigDTO providerConfig = socialProviderClientConfig(provider);
     if (!providerConfig.isReady()) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Social provider is not configured");
     }
 
-    SocialPrincipal socialPrincipal = resolveSocialPrincipal(provider, providerConfig, request);
-    OwnerSocialIdentity identity = ownerSocialIdentityRepository
+    SocialProviderOAuthClient.SocialPrincipalDTO socialPrincipal = socialProviderOAuthClient.resolvePrincipal(
+        provider,
+        new SocialProviderOAuthClient.SocialProviderAuthConfigDTO(
+            providerConfig.clientId(),
+            providerConfig.clientSecret(),
+            providerConfig.callbackUri()),
+        new AuthServerSocialLoginRequestDTO(
+            request.code(),
+            request.codeVerifier(),
+            request.deviceId(),
+            request.state()));
+    OwnerSocialIdentityEntity identity = ownerSocialIdentityRepository
         .findByProviderAndProviderSubject(provider, socialPrincipal.subject())
         .orElse(null);
 
-    Owner owner = identity == null
+    OwnerEntity owner = identity == null
         ? ownerRepository.findByEmail(normalizeEmail(socialPrincipal.email())).orElse(null)
         : identity.getOwner();
     if (owner == null) {
       if (!allowCreate) {
         throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Owner is not registered");
       }
-      owner = Owner.builder()
+      owner = OwnerEntity.builder()
           .email(socialPrincipal.email())
           .passwordHash(passwordEncoder.encode(UUID.randomUUID().toString()))
-          .role(OwnerRole.USER)
+          .role(OwnerRoleEnum.USER)
           .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
           .active(true)
           .emailVerifiedAt(OffsetDateTime.now(ZoneOffset.UTC))
@@ -271,10 +273,10 @@ public class OwnerAuthService {
     }
 
     syncOwnerEmail(owner, socialPrincipal.email());
-    Owner savedOwner = saveOwner(owner);
+    OwnerEntity savedOwner = saveOwner(owner);
 
-    OwnerSocialIdentity socialIdentity = identity == null
-        ? OwnerSocialIdentity.builder()
+    OwnerSocialIdentityEntity socialIdentity = identity == null
+        ? OwnerSocialIdentityEntity.builder()
             .owner(savedOwner)
             .provider(provider)
             .providerSubject(socialPrincipal.subject())
@@ -284,10 +286,10 @@ public class OwnerAuthService {
     socialIdentity.setProviderEmailVerified(socialPrincipal.emailVerified());
     ownerSocialIdentityRepository.save(socialIdentity);
 
-    return new OwnerLoginResponse(jwtService.generateToken(savedOwner), toResponse(savedOwner));
+    return new OwnerLoginResponseDTO(jwtService.generateToken(savedOwner), toResponse(savedOwner));
   }
 
-  private void syncOwnerEmail(Owner owner, String email) {
+  private void syncOwnerEmail(OwnerEntity owner, String email) {
     String normalizedEmail = normalizeEmail(email);
     if (!StringUtils.hasText(normalizedEmail) || normalizedEmail.equals(normalizeEmail(owner.getEmail()))) {
       return;
@@ -300,7 +302,7 @@ public class OwnerAuthService {
     }
   }
 
-  private Owner saveOwner(Owner owner) {
+  private OwnerEntity saveOwner(OwnerEntity owner) {
     try {
       return ownerRepository.save(owner);
     } catch (DataIntegrityViolationException ex) {
@@ -308,220 +310,27 @@ public class OwnerAuthService {
     }
   }
 
-  private AuthServerSocialProvider parseProvider(String provider) {
+  private AuthServerSocialProviderEnum parseProvider(String provider) {
     try {
-      return AuthServerSocialProvider.fromPath(provider);
+      return AuthServerSocialProviderEnum.fromPath(provider);
     } catch (IllegalArgumentException ex) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
   }
 
-  private SocialPrincipal resolveSocialPrincipal(
-      AuthServerSocialProvider provider,
-      SocialProviderClientConfig providerConfig,
-      OwnerSocialAuthRequest request
-  ) {
-    String code = request.code().trim();
+  private SocialProviderClientConfigDTO socialProviderClientConfig(AuthServerSocialProviderEnum provider) {
     return switch (provider) {
-      case GOOGLE -> resolveGooglePrincipal(providerConfig, code);
-      case YANDEX -> resolveYandexPrincipal(providerConfig, code);
-      case VK -> resolveVkPrincipal(providerConfig, request);
-    };
-  }
-
-  private SocialPrincipal resolveGooglePrincipal(SocialProviderClientConfig providerConfig, String code) {
-    MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
-    form.add("code", code);
-    form.add("client_id", providerConfig.clientId());
-    form.add("client_secret", providerConfig.clientSecret());
-    form.add("redirect_uri", providerConfig.callbackUri());
-    form.add("grant_type", "authorization_code");
-
-    GoogleTokenResponse tokenResponse;
-    try {
-      tokenResponse = restClient.post()
-          .uri(GOOGLE_TOKEN_ENDPOINT)
-          .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-          .body(form)
-          .retrieve()
-          .body(GoogleTokenResponse.class);
-    } catch (RestClientException ex) {
-      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid Google authorization code");
-    }
-
-    if (tokenResponse == null || !StringUtils.hasText(tokenResponse.accessToken())) {
-      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Google token response is invalid");
-    }
-
-    GoogleUserInfo userInfo;
-    try {
-      userInfo = restClient.get()
-          .uri(GOOGLE_USERINFO_ENDPOINT)
-          .headers(headers -> headers.setBearerAuth(tokenResponse.accessToken()))
-          .retrieve()
-          .body(GoogleUserInfo.class);
-    } catch (RestClientException ex) {
-      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Failed to resolve Google user profile");
-    }
-
-    String subject = userInfo == null ? null : trimToNull(userInfo.sub());
-    String email = userInfo == null ? null : normalizeEmail(userInfo.email());
-    boolean emailVerified = userInfo != null && Boolean.TRUE.equals(userInfo.emailVerified());
-    if (!StringUtils.hasText(subject) || !StringUtils.hasText(email)) {
-      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Google user profile is incomplete");
-    }
-    if (!emailVerified) {
-      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Google email is not verified");
-    }
-
-    return new SocialPrincipal(subject, email, true);
-  }
-
-  private SocialPrincipal resolveYandexPrincipal(SocialProviderClientConfig providerConfig, String code) {
-    MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
-    form.add("grant_type", "authorization_code");
-    form.add("code", code);
-    form.add("client_id", providerConfig.clientId());
-    form.add("client_secret", providerConfig.clientSecret());
-    form.add("redirect_uri", providerConfig.callbackUri());
-
-    YandexTokenResponse tokenResponse;
-    try {
-      tokenResponse = restClient.post()
-          .uri(YANDEX_TOKEN_ENDPOINT)
-          .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-          .body(form)
-          .retrieve()
-          .body(YandexTokenResponse.class);
-    } catch (RestClientResponseException ex) {
-      String body = ex.getResponseBodyAsString();
-      if (body != null && body.toLowerCase().contains("invalid_client")) {
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Yandex OAuth client config is invalid");
-      }
-      throw new ResponseStatusException(
-          HttpStatus.UNAUTHORIZED,
-          "Invalid Yandex authorization code or redirect_uri mismatch");
-    } catch (RestClientException ex) {
-      throw new ResponseStatusException(
-          HttpStatus.UNAUTHORIZED,
-          "Invalid Yandex authorization code or redirect_uri mismatch");
-    }
-
-    if (tokenResponse == null || !StringUtils.hasText(tokenResponse.accessToken())) {
-      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Yandex token response is invalid");
-    }
-
-    YandexUserInfo userInfo;
-    try {
-      userInfo = restClient.get()
-          .uri(YANDEX_USERINFO_ENDPOINT)
-          .headers(headers -> headers.set("Authorization", "OAuth " + tokenResponse.accessToken()))
-          .retrieve()
-          .body(YandexUserInfo.class);
-    } catch (RestClientException ex) {
-      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Failed to resolve Yandex user profile");
-    }
-
-    String subject = userInfo == null ? null : trimToNull(userInfo.id());
-    String email = userInfo == null ? null : normalizeEmail(userInfo.defaultEmail());
-    if (!StringUtils.hasText(email) && userInfo != null && userInfo.emails() != null) {
-      email = userInfo.emails().stream()
-          .map(this::normalizeEmail)
-          .filter(StringUtils::hasText)
-          .findFirst()
-          .orElse(null);
-    }
-    if (!StringUtils.hasText(subject) || !StringUtils.hasText(email)) {
-      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Yandex user profile is incomplete");
-    }
-
-    return new SocialPrincipal(subject, email, true);
-  }
-
-  private SocialPrincipal resolveVkPrincipal(SocialProviderClientConfig providerConfig, OwnerSocialAuthRequest request) {
-    String codeVerifier = trimToNull(request.codeVerifier());
-    String deviceId = trimToNull(request.deviceId());
-    String state = trimToNull(request.state());
-    if (!StringUtils.hasText(codeVerifier) || !StringUtils.hasText(deviceId)) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "VK auth payload is incomplete");
-    }
-
-    MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
-    form.add("grant_type", "authorization_code");
-    form.add("code_verifier", codeVerifier);
-    form.add("redirect_uri", providerConfig.callbackUri());
-    form.add("code", request.code().trim());
-    form.add("client_id", providerConfig.clientId());
-    form.add("device_id", deviceId);
-    if (StringUtils.hasText(state)) {
-      form.add("state", state);
-    }
-
-    VkTokenResponse tokenResponse;
-    try {
-      tokenResponse = restClient.post()
-          .uri(VK_TOKEN_ENDPOINT)
-          .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-          .body(form)
-          .retrieve()
-          .body(VkTokenResponse.class);
-    } catch (RestClientException ex) {
-      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid VK authorization code");
-    }
-
-    if (tokenResponse == null
-        || !StringUtils.hasText(tokenResponse.accessToken())
-        || tokenResponse.userId() == null) {
-      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "VK token response is invalid");
-    }
-
-    MultiValueMap<String, String> userInfoForm = new LinkedMultiValueMap<>();
-    userInfoForm.add("client_id", providerConfig.clientId());
-    userInfoForm.add("access_token", tokenResponse.accessToken());
-
-    VkUserInfoResponse userInfoResponse;
-    try {
-      userInfoResponse = restClient.post()
-          .uri(VK_USERINFO_ENDPOINT)
-          .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-          .body(userInfoForm)
-          .retrieve()
-          .body(VkUserInfoResponse.class);
-    } catch (RestClientException ex) {
-      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Failed to resolve VK user profile");
-    }
-
-    Long subjectUserId = tokenResponse.userId();
-    String email = null;
-    if (userInfoResponse != null && userInfoResponse.user() != null) {
-      if (userInfoResponse.user().userId() != null) {
-        subjectUserId = userInfoResponse.user().userId();
-      }
-      email = normalizeEmail(userInfoResponse.user().email());
-    }
-
-    if (!StringUtils.hasText(email)) {
-      throw new ResponseStatusException(
-          HttpStatus.UNAUTHORIZED,
-          "VK email is unavailable. Add email scope in VK app settings");
-    }
-
-    return new SocialPrincipal(String.valueOf(subjectUserId), email, true);
-  }
-
-  private SocialProviderClientConfig socialProviderClientConfig(AuthServerSocialProvider provider) {
-    return switch (provider) {
-      case GOOGLE -> new SocialProviderClientConfig(
+      case GOOGLE -> new SocialProviderClientConfigDTO(
           ownerSocialGoogleEnabled,
           trimToNull(ownerSocialGoogleClientId),
           trimToNull(ownerSocialGoogleClientSecret),
           trimToNull(ownerSocialGoogleCallbackUri));
-      case YANDEX -> new SocialProviderClientConfig(
+      case YANDEX -> new SocialProviderClientConfigDTO(
           ownerSocialYandexEnabled,
           trimToNull(ownerSocialYandexClientId),
           trimToNull(ownerSocialYandexClientSecret),
           trimToNull(ownerSocialYandexCallbackUri));
-      case VK -> new SocialProviderClientConfig(
+      case VK -> new SocialProviderClientConfigDTO(
           ownerSocialVkEnabled,
           trimToNull(ownerSocialVkClientId),
           trimToNull(ownerSocialVkClientSecret),
@@ -544,7 +353,7 @@ public class OwnerAuthService {
     return new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
   }
 
-  private void resendVerificationEmailBestEffort(Owner owner) {
+  private void resendVerificationEmailBestEffort(OwnerEntity owner) {
     try {
       String code = ownerOtpService.createVerificationCode(owner);
       emailService.sendVerificationEmail(owner.getEmail(), buildVerificationLink(code));
@@ -557,7 +366,7 @@ public class OwnerAuthService {
     }
   }
 
-  private void sendOwnerPasswordResetBestEffort(Owner owner) {
+  private void sendOwnerPasswordResetBestEffort(OwnerEntity owner) {
     try {
       String code = ownerOtpService.createResetCode(owner);
       ownerRepository.save(owner);
@@ -571,9 +380,9 @@ public class OwnerAuthService {
     }
   }
 
-  private OwnerResponse toResponse(Owner user) {
+  private OwnerResponseDTO toResponse(OwnerEntity user) {
     List<Long> domainIds;
-    if (user.getRole() == OwnerRole.ADMIN) {
+    if (user.getRole() == OwnerRoleEnum.ADMIN) {
       domainIds = Collections.emptyList();
     } else {
       domainIds = ownerDomainRepository.findByOwnerId(user.getId()).stream()
@@ -582,7 +391,7 @@ public class OwnerAuthService {
           .toList();
     }
 
-    return new OwnerResponse(
+    return new OwnerResponseDTO(
         user.getId(),
         user.getEmail(),
         user.getRole(),
@@ -605,7 +414,7 @@ public class OwnerAuthService {
     return resetBaseUrl + "?token=" + token;
   }
 
-  private record SocialProviderClientConfig(
+  private record SocialProviderClientConfigDTO(
       boolean enabled,
       String clientId,
       String clientSecret,
@@ -618,58 +427,4 @@ public class OwnerAuthService {
           && StringUtils.hasText(callbackUri);
     }
   }
-
-  private record SocialPrincipal(String subject, String email, boolean emailVerified) {
-  }
-
-  private record GoogleTokenResponse(
-      @com.fasterxml.jackson.annotation.JsonProperty("access_token")
-      String accessToken
-  ) {
-  }
-
-  private record GoogleUserInfo(
-      String sub,
-      String email,
-      @com.fasterxml.jackson.annotation.JsonProperty("email_verified")
-      Boolean emailVerified
-  ) {
-  }
-
-  private record YandexTokenResponse(
-      @com.fasterxml.jackson.annotation.JsonProperty("access_token")
-      String accessToken
-  ) {
-  }
-
-  private record YandexUserInfo(
-      String id,
-      @com.fasterxml.jackson.annotation.JsonProperty("default_email")
-      String defaultEmail,
-      List<String> emails
-  ) {
-  }
-
-  private record VkTokenResponse(
-      @com.fasterxml.jackson.annotation.JsonProperty("access_token")
-      String accessToken,
-      @com.fasterxml.jackson.annotation.JsonProperty("id_token")
-      String idToken,
-      @com.fasterxml.jackson.annotation.JsonProperty("user_id")
-      Long userId
-  ) {
-  }
-
-  private record VkUserInfoResponse(
-      VkUserInfo user
-  ) {
-  }
-
-  private record VkUserInfo(
-      @com.fasterxml.jackson.annotation.JsonProperty("user_id")
-      Long userId,
-      String email
-  ) {
-  }
-
 }

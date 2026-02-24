@@ -1,21 +1,21 @@
 package com.userid.service;
 
-import com.userid.api.common.ApiMessage;
-import com.userid.api.user.UserAuthResponse;
-import com.userid.api.user.UserConfirmRequest;
-import com.userid.api.user.UserForgotPasswordRequest;
-import com.userid.api.user.UserLoginRequest;
-import com.userid.api.user.UserLoginResponse;
-import com.userid.api.user.UserRegistrationRequest;
-import com.userid.api.user.UserResetPasswordRequest;
-import com.userid.api.user.UserResponse;
-import com.userid.api.user.UserSelfUpdateRequest;
-import com.userid.dal.entity.OtpType;
-import com.userid.dal.entity.OtpUser;
-import com.userid.dal.entity.User;
+import com.userid.api.common.ApiMessageDTO;
+import com.userid.api.user.UserAuthResponseDTO;
+import com.userid.api.user.UserConfirmRequestDTO;
+import com.userid.api.user.UserForgotPasswordRequestDTO;
+import com.userid.api.user.UserLoginRequestDTO;
+import com.userid.api.user.UserLoginResponseDTO;
+import com.userid.api.user.UserRegistrationRequestDTO;
+import com.userid.api.user.UserResetPasswordRequestDTO;
+import com.userid.api.user.UserResponseDTO;
+import com.userid.api.user.UserSelfUpdateRequestDTO;
+import com.userid.dal.entity.OtpTypeEnum;
+import com.userid.dal.entity.OtpUserEntity;
+import com.userid.dal.entity.UserEntity;
 import com.userid.dal.repo.UserRepository;
 import com.userid.security.DomainUserJwtService;
-import com.userid.security.DomainUserPrincipal;
+import com.userid.security.DomainUserPrincipalDTO;
 import com.userid.api.client.EmailNormalizer;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.OffsetDateTime;
@@ -41,30 +41,30 @@ public class DomainUserAuthService {
   private final EmailService emailService;
   private final UserService userService;
 
-  public UserLoginResponse register(Long domainId, UserRegistrationRequest request) {
+  public UserLoginResponseDTO register(Long domainId, UserRegistrationRequestDTO request) {
     String normalizedEmail = EmailNormalizer.normalizeNullable(request.email());
     try {
-      UserResponse user = userService.registerByDomain(domainId, request);
-      return new UserLoginResponse(null, toAuthResponse(domainId, user));
+      UserResponseDTO user = userService.registerByDomain(domainId, request);
+      return new UserLoginResponseDTO(null, toAuthResponse(domainId, user));
     } catch (ResponseStatusException ex) {
       if (ex.getStatusCode().value() != HttpStatus.CONFLICT.value()) {
         throw ex;
       }
       try {
-        return login(domainId, new UserLoginRequest(normalizedEmail, request.password()));
+        return login(domainId, new UserLoginRequestDTO(normalizedEmail, request.password()));
       } catch (ResponseStatusException loginEx) {
         if (loginEx.getStatusCode().value() != HttpStatus.UNAUTHORIZED.value()) {
           throw loginEx;
         }
-        User existing = sendPasswordRecoveryBestEffort(domainId, normalizedEmail);
-        return new UserLoginResponse(null, existing == null ? null : toAuthResponse(existing));
+        UserEntity existing = sendPasswordRecoveryBestEffort(domainId, normalizedEmail);
+        return new UserLoginResponseDTO(null, existing == null ? null : toAuthResponse(existing));
       }
     }
   }
 
-  public UserLoginResponse login(Long domainId, UserLoginRequest request) {
+  public UserLoginResponseDTO login(Long domainId, UserLoginRequestDTO request) {
     String email = EmailNormalizer.normalizeNullable(request.email());
-    User user = userRepository.findByDomainIdAndEmail(domainId, email)
+    UserEntity user = userRepository.findByDomainIdAndEmail(domainId, email)
         .or(() -> userRepository.findByDomainIdAndEmailPending(domainId, email))
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
@@ -79,13 +79,13 @@ public class DomainUserAuthService {
     }
 
     String token = domainUserJwtService.generateToken(user);
-    return new UserLoginResponse(token, toAuthResponse(user));
+    return new UserLoginResponseDTO(token, toAuthResponse(user));
   }
 
   @Transactional
-  public UserLoginResponse confirm(Long domainId, UserConfirmRequest request) {
-    OtpUser otp = userOtpService.requireValid(OtpType.VERIFICATION, request.code());
-    User user = otp.getUser();
+  public UserLoginResponseDTO confirm(Long domainId, UserConfirmRequestDTO request) {
+    OtpUserEntity otp = userOtpService.requireValid(OtpTypeEnum.VERIFICATION, request.code());
+    UserEntity user = otp.getUser();
     if (!domainId.equals(user.getDomain().getId())) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Domain mismatch");
     }
@@ -103,43 +103,43 @@ public class DomainUserAuthService {
     }
     userOtpService.clearVerificationCode(user);
     String token = domainUserJwtService.generateToken(user);
-    return new UserLoginResponse(token, toAuthResponse(user));
+    return new UserLoginResponseDTO(token, toAuthResponse(user));
   }
 
-  public ApiMessage forgotPassword(Long domainId, UserForgotPasswordRequest request) {
+  public ApiMessageDTO forgotPassword(Long domainId, UserForgotPasswordRequestDTO request) {
     String email = EmailNormalizer.normalizeNullable(request.email());
-    User user = userRepository.findByDomainIdAndEmail(domainId, email)
+    UserEntity user = userRepository.findByDomainIdAndEmail(domainId, email)
         .or(() -> userRepository.findByDomainIdAndEmailPending(domainId, email))
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     if (user.getEmailVerifiedAt() == null) {
       String verificationCode = userOtpService.createVerificationCode(user);
       emailService.sendOtpEmail(user.getDomain(), resolveVerificationEmail(user), verificationCode);
-      return new ApiMessage("ok");
+      return new ApiMessageDTO("ok");
     }
     String code = userOtpService.createResetCode(user);
     userRepository.save(user);
     emailService.sendUserPasswordResetCode(user.getDomain(), user.getEmail(), code);
-    return new ApiMessage("ok");
+    return new ApiMessageDTO("ok");
   }
 
-  public ApiMessage resetPassword(Long domainId, UserResetPasswordRequest request) {
-    OtpUser otp = userOtpService.requireValid(OtpType.RESET, request.code());
-    User user = otp.getUser();
+  public ApiMessageDTO resetPassword(Long domainId, UserResetPasswordRequestDTO request) {
+    OtpUserEntity otp = userOtpService.requireValid(OtpTypeEnum.RESET, request.code());
+    UserEntity user = otp.getUser();
     if (!domainId.equals(user.getDomain().getId())) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Domain mismatch");
     }
     user.setPasswordHash(passwordEncoder.encode(request.password()));
     userOtpService.clearResetCode(user);
     userRepository.save(user);
-    return new ApiMessage("ok");
+    return new ApiMessageDTO("ok");
   }
 
-  public UserResponse updateSelf(Long domainId, HttpServletRequest request, UserSelfUpdateRequest body) {
-    DomainUserPrincipal principal = parsePrincipal(request);
+  public UserResponseDTO updateSelf(Long domainId, HttpServletRequest request, UserSelfUpdateRequestDTO body) {
+    DomainUserPrincipalDTO principal = parsePrincipal(request);
     if (!principal.domainId().equals(domainId)) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Domain mismatch");
     }
-    User user = userRepository.findByIdAndDomainId(principal.id(), domainId)
+    UserEntity user = userRepository.findByIdAndDomainId(principal.id(), domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
     if (body.password() != null && !body.password().isBlank()) {
@@ -151,21 +151,21 @@ public class DomainUserAuthService {
         user.setActive(true);
       }
     }
-    User saved = userRepository.saveAndFlush(user);
+    UserEntity saved = userRepository.saveAndFlush(user);
     return userService.toResponse(saved);
   }
 
-  public ApiMessage resendVerification(Long domainId, UserForgotPasswordRequest request) {
+  public ApiMessageDTO resendVerification(Long domainId, UserForgotPasswordRequestDTO request) {
     String email = EmailNormalizer.normalizeNullable(request.email());
-    User user = userRepository.findByDomainIdAndEmail(domainId, email)
+    UserEntity user = userRepository.findByDomainIdAndEmail(domainId, email)
         .or(() -> userRepository.findByDomainIdAndEmailPending(domainId, email))
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     String code = userOtpService.createVerificationCode(user);
     emailService.sendOtpEmail(user.getDomain(), resolveVerificationEmail(user), code);
-    return new ApiMessage("ok");
+    return new ApiMessageDTO("ok");
   }
 
-  private DomainUserPrincipal parsePrincipal(HttpServletRequest request) {
+  private DomainUserPrincipalDTO parsePrincipal(HttpServletRequest request) {
     String header = request.getHeader(HttpHeaders.AUTHORIZATION);
     if (header == null || !header.startsWith("Bearer ")) {
       throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing token");
@@ -181,8 +181,8 @@ public class DomainUserAuthService {
     }
   }
 
-  private UserAuthResponse toAuthResponse(User user) {
-    return new UserAuthResponse(
+  private UserAuthResponseDTO toAuthResponse(UserEntity user) {
+    return new UserAuthResponseDTO(
         user.getId(),
         user.getDomain().getId(),
         user.getEmail(),
@@ -192,8 +192,8 @@ public class DomainUserAuthService {
     );
   }
 
-  private UserAuthResponse toAuthResponse(Long domainId, UserResponse user) {
-    return new UserAuthResponse(
+  private UserAuthResponseDTO toAuthResponse(Long domainId, UserResponseDTO user) {
+    return new UserAuthResponseDTO(
         user.id(),
         domainId,
         user.email(),
@@ -203,7 +203,7 @@ public class DomainUserAuthService {
     );
   }
 
-  private String resolveVerificationEmail(User user) {
+  private String resolveVerificationEmail(UserEntity user) {
     if (user.getEmailPending() != null && !user.getEmailPending().isBlank()) {
       return user.getEmailPending();
     }
@@ -213,9 +213,9 @@ public class DomainUserAuthService {
     throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User email is not set");
   }
 
-  private User sendPasswordRecoveryBestEffort(Long domainId, String email) {
+  private UserEntity sendPasswordRecoveryBestEffort(Long domainId, String email) {
     try {
-      User user = userRepository.findByDomainIdAndEmail(domainId, email)
+      UserEntity user = userRepository.findByDomainIdAndEmail(domainId, email)
           .or(() -> userRepository.findByDomainIdAndEmailPending(domainId, email))
           .orElse(null);
       if (user == null) {

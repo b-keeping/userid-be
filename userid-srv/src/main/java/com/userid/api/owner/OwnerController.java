@@ -1,7 +1,7 @@
 package com.userid.api.owner;
 
-import com.userid.api.common.ApiMessage;
-import com.userid.security.AuthPrincipal;
+import com.userid.api.common.ApiMessageDTO;
+import com.userid.security.AuthPrincipalDTO;
 import com.userid.service.OwnerService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -23,62 +23,62 @@ public class OwnerController {
   private final OwnerService ownerService;
 
   @PostMapping
-  public OwnerResponse create(
-      @AuthenticationPrincipal AuthPrincipal principal,
-      @Valid @RequestBody OwnerRequest request
+  public OwnerResponseDTO create(
+      @AuthenticationPrincipal AuthPrincipalDTO principal,
+      @Valid @RequestBody OwnerRequestDTO request
   ) {
     return ownerService.create(principal.id(), request);
   }
 
   @GetMapping
-  public List<OwnerResponse> list(
-      @AuthenticationPrincipal AuthPrincipal principal
+  public List<OwnerResponseDTO> list(
+      @AuthenticationPrincipal AuthPrincipalDTO principal
   ) {
     return ownerService.list(principal.id());
   }
 
   @GetMapping("/{ownerId}")
-  public OwnerResponse get(
-      @AuthenticationPrincipal AuthPrincipal principal,
+  public OwnerResponseDTO get(
+      @AuthenticationPrincipal AuthPrincipalDTO principal,
       @PathVariable Long ownerId
   ) {
     return ownerService.get(principal.id(), ownerId);
   }
 
   @PostMapping("/{ownerId}/domains")
-  public OwnerResponse addDomain(
-      @AuthenticationPrincipal AuthPrincipal principal,
+  public OwnerResponseDTO addDomain(
+      @AuthenticationPrincipal AuthPrincipalDTO principal,
       @PathVariable Long ownerId,
-      @Valid @RequestBody OwnerDomainRequest request
+      @Valid @RequestBody OwnerDomainRequestDTO request
   ) {
     return ownerService.addDomain(principal.id(), ownerId, request);
   }
 
   @PutMapping("/{ownerId}")
-  public OwnerResponse update(
-      @AuthenticationPrincipal AuthPrincipal principal,
+  public OwnerResponseDTO update(
+      @AuthenticationPrincipal AuthPrincipalDTO principal,
       @PathVariable Long ownerId,
-      @RequestBody OwnerUpdateRequest request
+      @RequestBody OwnerUpdateRequestDTO request
   ) {
     return ownerService.update(principal.id(), ownerId, request);
   }
 
   @DeleteMapping("/{ownerId}/domains/{domainId}")
-  public ApiMessage removeDomain(
-      @AuthenticationPrincipal AuthPrincipal principal,
+  public ApiMessageDTO removeDomain(
+      @AuthenticationPrincipal AuthPrincipalDTO principal,
       @PathVariable Long ownerId,
       @PathVariable Long domainId
   ) {
     ownerService.removeDomain(principal.id(), ownerId, domainId);
-    return new ApiMessage("ok");
+    return new ApiMessageDTO("ok");
   }
 
   @DeleteMapping("/{ownerId}")
-  public ApiMessage delete(
-      @AuthenticationPrincipal AuthPrincipal principal,
+  public ApiMessageDTO delete(
+      @AuthenticationPrincipal AuthPrincipalDTO principal,
       @PathVariable Long ownerId
   ) {
     ownerService.delete(principal.id(), ownerId);
-    return new ApiMessage("ok");
+    return new ApiMessageDTO("ok");
   }
 }

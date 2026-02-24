@@ -32,7 +32,7 @@ public class UseridApiMessageResolver {
   }
 
   private String getMessage(String key, String fallback) {
-    UseridApiLanguage language = properties.getLanguage();
+    UseridApiLanguageEnum language = properties.getLanguage();
     Locale locale = language == null ? Locale.ENGLISH : language.toLocale();
     try {
       ResourceBundle bundle = ResourceBundle.getBundle(BUNDLE_BASE_NAME, locale);

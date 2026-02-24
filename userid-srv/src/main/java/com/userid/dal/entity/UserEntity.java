@@ -1,0 +1,84 @@
+package com.userid.dal.entity;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import java.time.OffsetDateTime;
+import java.util.HashSet;
+import java.util.Set;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
+@Entity
+@Table(
+    name = "users",
+    uniqueConstraints = {
+      @UniqueConstraint(name = "uk_users_domain_email", columnNames = {"domain_id", "email"}),
+      @UniqueConstraint(name = "uk_users_domain_email_pending", columnNames = {"domain_id", "email_pending"})
+    },
+    indexes = {
+      @Index(name = "idx_users_domain", columnList = "domain_id")
+    }
+)
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class UserEntity {
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "domain_id", nullable = false)
+  private DomainEntity domain;
+
+  @Column(length = 255)
+  private String email;
+
+  @Column(name = "email_pending", nullable = false, length = 255)
+  private String emailPending;
+
+  @Column(name = "password_hash", nullable = false, length = 255)
+  private String passwordHash;
+
+  @Column(name = "created_at", nullable = false)
+  private OffsetDateTime createdAt;
+
+  @Column(name = "email_verified_at")
+  private OffsetDateTime emailVerifiedAt;
+
+  @Builder.Default
+  @Column(name = "active", nullable = false)
+  @ColumnDefault("true")
+  private boolean active = false;
+
+  @Builder.Default
+  @Column(name = "profile_jsonb", nullable = false, columnDefinition = "jsonb")
+  @JdbcTypeCode(SqlTypes.JSON)
+  @ColumnDefault("'{}'::jsonb")
+  private JsonNode profileJsonb = JsonNodeFactory.instance.objectNode();
+
+  @Builder.Default
+  @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+  private Set<UserProfileValueEntity> values = new HashSet<>();
+}

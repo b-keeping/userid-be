@@ -1,8 +1,8 @@
 package com.userid.api.auth;
 
-import com.userid.api.common.ApiMessage;
-import com.userid.api.client.AuthServerSocialProvider;
-import com.userid.api.owner.OwnerResponse;
+import com.userid.api.common.ApiMessageDTO;
+import com.userid.api.client.AuthServerSocialProviderEnum;
+import com.userid.api.owner.OwnerResponseDTO;
 import com.userid.service.OwnerAuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,51 +23,51 @@ public class OwnerAuthController {
   private final OwnerAuthService ownerAuthService;
 
   @PostMapping("/login")
-  public OwnerLoginResponse login(@Valid @RequestBody OwnerLoginRequest request) {
+  public OwnerLoginResponseDTO login(@Valid @RequestBody OwnerLoginRequestDTO request) {
     return ownerAuthService.login(request);
   }
 
   @PostMapping("/login/social")
-  public OwnerLoginResponse socialLogin(@Valid @RequestBody OwnerSocialAuthRequest request) {
+  public OwnerLoginResponseDTO socialLogin(@Valid @RequestBody OwnerSocialAuthRequestDTO request) {
     return ownerAuthService.socialLogin(request);
   }
 
   @PostMapping("/register")
-  public OwnerResponse register(@Valid @RequestBody OwnerRegisterRequest request) {
+  public OwnerResponseDTO register(@Valid @RequestBody OwnerRegisterRequestDTO request) {
     return ownerAuthService.register(request);
   }
 
   @PostMapping("/register/social")
-  public OwnerLoginResponse socialRegister(@Valid @RequestBody OwnerSocialAuthRequest request) {
+  public OwnerLoginResponseDTO socialRegister(@Valid @RequestBody OwnerSocialAuthRequestDTO request) {
     return ownerAuthService.socialRegister(request);
   }
 
   @GetMapping("/social/{provider}/config")
-  public OwnerSocialProviderConfigResponse socialProviderConfig(@PathVariable String provider) {
+  public OwnerSocialProviderConfigResponseDTO socialProviderConfig(@PathVariable String provider) {
     return ownerAuthService.getSocialProviderConfig(parseProvider(provider));
   }
 
   @GetMapping("/confirm")
-  public ApiMessage confirm(@RequestParam String token) {
+  public ApiMessageDTO confirm(@RequestParam String token) {
     ownerAuthService.confirm(token);
-    return new ApiMessage("ok");
+    return new ApiMessageDTO("ok");
   }
 
   @PostMapping("/forgot-password")
-  public ApiMessage forgotPassword(@Valid @RequestBody OwnerPasswordResetRequest request) {
+  public ApiMessageDTO forgotPassword(@Valid @RequestBody OwnerPasswordResetRequestDTO request) {
     ownerAuthService.requestPasswordReset(request);
-    return new ApiMessage("ok");
+    return new ApiMessageDTO("ok");
   }
 
   @PostMapping("/reset-password")
-  public ApiMessage resetPassword(@Valid @RequestBody OwnerPasswordResetConfirmRequest request) {
+  public ApiMessageDTO resetPassword(@Valid @RequestBody OwnerPasswordResetConfirmRequestDTO request) {
     ownerAuthService.resetPassword(request);
-    return new ApiMessage("ok");
+    return new ApiMessageDTO("ok");
   }
 
-  private AuthServerSocialProvider parseProvider(String provider) {
+  private AuthServerSocialProviderEnum parseProvider(String provider) {
     try {
-      return AuthServerSocialProvider.fromPath(provider);
+      return AuthServerSocialProviderEnum.fromPath(provider);
     } catch (IllegalArgumentException ex) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage());
     }

@@ -1,7 +1,7 @@
 package com.userid.api.user;
 
-import com.userid.api.common.ApiMessage;
-import com.userid.security.AuthPrincipal;
+import com.userid.api.common.ApiMessageDTO;
+import com.userid.security.AuthPrincipalDTO;
 import com.userid.service.UserService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -23,17 +23,17 @@ public class UserController {
   private final UserService userService;
 
   @PostMapping
-  public UserResponse register(
-      @AuthenticationPrincipal AuthPrincipal principal,
+  public UserResponseDTO register(
+      @AuthenticationPrincipal AuthPrincipalDTO principal,
       @PathVariable Long domainId,
-      @Valid @RequestBody UserRegistrationRequest request
+      @Valid @RequestBody UserRegistrationRequestDTO request
   ) {
     return userService.register(principal.id(), domainId, request);
   }
 
   @GetMapping("/{userId}")
-  public UserResponse get(
-      @AuthenticationPrincipal AuthPrincipal principal,
+  public UserResponseDTO get(
+      @AuthenticationPrincipal AuthPrincipalDTO principal,
       @PathVariable Long domainId,
       @PathVariable Long userId
   ) {
@@ -41,31 +41,31 @@ public class UserController {
   }
 
   @PostMapping("/search")
-  public List<UserResponse> search(
-      @AuthenticationPrincipal AuthPrincipal principal,
+  public List<UserResponseDTO> search(
+      @AuthenticationPrincipal AuthPrincipalDTO principal,
       @PathVariable Long domainId,
-      @RequestBody UserSearchRequest request
+      @RequestBody UserSearchRequestDTO request
   ) {
     return userService.search(principal.id(), domainId, request);
   }
 
   @PutMapping("/{userId}")
-  public UserResponse update(
-      @AuthenticationPrincipal AuthPrincipal principal,
+  public UserResponseDTO update(
+      @AuthenticationPrincipal AuthPrincipalDTO principal,
       @PathVariable Long domainId,
       @PathVariable Long userId,
-      @RequestBody UserUpdateRequest request
+      @RequestBody UserUpdateRequestDTO request
   ) {
     return userService.update(principal.id(), domainId, userId, request);
   }
 
   @DeleteMapping("/{userId}")
-  public ApiMessage delete(
-      @AuthenticationPrincipal AuthPrincipal principal,
+  public ApiMessageDTO delete(
+      @AuthenticationPrincipal AuthPrincipalDTO principal,
       @PathVariable Long domainId,
       @PathVariable Long userId
   ) {
     userService.delete(principal.id(), domainId, userId);
-    return new ApiMessage("ok");
+    return new ApiMessageDTO("ok");
   }
 }

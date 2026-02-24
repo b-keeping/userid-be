@@ -1,15 +1,15 @@
 package com.userid.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.userid.api.domain.DomainApiTokenResponse;
-import com.userid.api.domain.DomainRequest;
-import com.userid.api.domain.DomainJwtSecretResponse;
-import com.userid.api.domain.DomainResponse;
-import com.userid.api.domain.DomainUpdateRequest;
-import com.userid.dal.entity.Domain;
-import com.userid.dal.entity.Owner;
-import com.userid.dal.entity.OwnerDomain;
-import com.userid.dal.entity.OwnerRole;
+import com.userid.api.domain.DomainApiTokenResponseDTO;
+import com.userid.api.domain.DomainRequestDTO;
+import com.userid.api.domain.DomainJwtSecretResponseDTO;
+import com.userid.api.domain.DomainResponseDTO;
+import com.userid.api.domain.DomainUpdateRequestDTO;
+import com.userid.dal.entity.DomainEntity;
+import com.userid.dal.entity.OwnerEntity;
+import com.userid.dal.entity.OwnerDomainEntity;
+import com.userid.dal.entity.OwnerRoleEnum;
 import com.userid.dal.repo.DomainRepository;
 import com.userid.dal.repo.DomainSocialProviderConfigRepository;
 import com.userid.dal.repo.OwnerDomainRepository;
@@ -53,34 +53,34 @@ public class DomainService {
   @org.springframework.beans.factory.annotation.Value("${auth.postal-admin.return-path-spf:v=spf1 a:post.userid.sh -all}")
   private String postalReturnPathSpf;
 
-  public DomainResponse create(Long ownerId, DomainRequest request) {
-    Owner requester = accessService.requireUser(ownerId);
+  public DomainResponseDTO create(Long ownerId, DomainRequestDTO request) {
+    OwnerEntity requester = accessService.requireUser(ownerId);
     log.info("Create domain requested ownerId={} role={} name={}", ownerId, requester.getRole(), request.name());
-    if (requester.getRole() != OwnerRole.ADMIN && request.ownerId() != null) {
+    if (requester.getRole() != OwnerRoleEnum.ADMIN && request.ownerId() != null) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Owner can be set only by admin");
     }
 
-    Owner owner = null;
-    if (requester.getRole() == OwnerRole.ADMIN) {
+    OwnerEntity owner = null;
+    if (requester.getRole() == OwnerRoleEnum.ADMIN) {
       Long targetOwnerId = request.ownerId();
       if (targetOwnerId == null) {
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Owner is required for admin");
       }
       owner = ownerRepository.findById(targetOwnerId)
           .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Owner not found"));
-      if (owner.getRole() != OwnerRole.USER) {
+      if (owner.getRole() != OwnerRoleEnum.USER) {
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Owner must be USER");
       }
     }
 
-    Domain domain = Domain.builder()
+    DomainEntity domain = DomainEntity.builder()
         .name(request.name())
         .build();
 
-    Domain saved = domainRepository.save(domain);
+    DomainEntity saved = domainRepository.save(domain);
     log.info("Domain created id={} name={}", saved.getId(), saved.getName());
     domainJwtSecretService.getOrCreateSecret(saved);
-    if (requester.getRole() == OwnerRole.ADMIN) {
+    if (requester.getRole() == OwnerRoleEnum.ADMIN) {
       if (ownerDomainRepository.existsByDomainId(saved.getId())) {
         throw new ResponseStatusException(HttpStatus.CONFLICT, "Domain already has owner");
       }
@@ -91,15 +91,15 @@ public class DomainService {
       }
       linkDomain(requester, saved);
     }
-    log.info("Domain ownership linked domainId={} ownerId={}", saved.getId(), requester.getRole() == OwnerRole.ADMIN ? owner.getId() : requester.getId());
+    log.info("Domain ownership linked domainId={} ownerId={}", saved.getId(), requester.getRole() == OwnerRoleEnum.ADMIN ? owner.getId() : requester.getId());
     populateDns(saved, false);
     log.info("Domain DNS populated domainId={}", saved.getId());
     return toResponse(domainRepository.save(saved));
   }
 
-  public List<DomainResponse> list(Long ownerId) {
+  public List<DomainResponseDTO> list(Long ownerId) {
     var user = accessService.requireUser(ownerId);
-    if (user.getRole() == OwnerRole.ADMIN) {
+    if (user.getRole() == OwnerRoleEnum.ADMIN) {
       return domainRepository.findAll().stream()
           .map(this::toResponse)
           .collect(Collectors.toList());
@@ -114,27 +114,27 @@ public class DomainService {
         .collect(Collectors.toList());
   }
 
-  public DomainResponse update(Long ownerId, Long domainId, DomainUpdateRequest request) {
+  public DomainResponseDTO update(Long ownerId, Long domainId, DomainUpdateRequestDTO request) {
     accessService.requireDomainAccess(ownerId, domainId);
-    Domain domain = domainRepository.findById(domainId)
+    DomainEntity domain = domainRepository.findById(domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found"));
     if (request.name() != null && !request.name().isBlank()) {
       domain.setName(request.name());
     }
 
-    Domain saved = domainRepository.save(domain);
+    DomainEntity saved = domainRepository.save(domain);
     return toResponse(saved);
   }
 
-  public DomainResponse checkDns(Long ownerId, Long domainId) {
+  public DomainResponseDTO checkDns(Long ownerId, Long domainId) {
     accessService.requireDomainAccess(ownerId, domainId);
-    Domain domain = domainRepository.findById(domainId)
+    DomainEntity domain = domainRepository.findById(domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found"));
 
     String serverName = buildServerName(domain.getName());
     boolean psrpOk = false;
     try {
-      PostalAdminClient.VerifyCheckResponse verifyResponse =
+      PostalAdminClient.VerifyCheckResponseDTO verifyResponse =
           postalAdminClient.verifyCheck(postalOrganization, serverName, domain.getName());
       if (verifyResponse.record() != null) {
         applyRecord(
@@ -148,7 +148,7 @@ public class DomainService {
         );
       }
 
-      PostalAdminClient.DnsCheckResponse dnsResponse =
+      PostalAdminClient.DnsCheckResponseDTO dnsResponse =
           postalAdminClient.dnsCheck(postalOrganization, serverName, domain.getName());
       JsonNode records = dnsResponse.records();
       applyRecord(findRecord(records, "spf"), domain::setSpf, domain::setSpfHost, domain::setSpfType, null, null, domain::setSpfStt);
@@ -211,22 +211,22 @@ public class DomainService {
     return toResponse(domainRepository.save(domain));
   }
 
-  public DomainResponse resetSmtp(Long ownerId, Long domainId) {
+  public DomainResponseDTO resetSmtp(Long ownerId, Long domainId) {
     accessService.requireDomainAccess(ownerId, domainId);
-    Domain domain = domainRepository.findById(domainId)
+    DomainEntity domain = domainRepository.findById(domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found"));
     populateDns(domain, true);
     return toResponse(domainRepository.save(domain));
   }
 
-  public DomainResponse verifyDomain(Long ownerId, Long domainId) {
+  public DomainResponseDTO verifyDomain(Long ownerId, Long domainId) {
     accessService.requireDomainAccess(ownerId, domainId);
-    Domain domain = domainRepository.findById(domainId)
+    DomainEntity domain = domainRepository.findById(domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found"));
 
     String serverName = buildServerName(domain.getName());
     try {
-      PostalAdminClient.VerifyCheckResponse verifyResponse =
+      PostalAdminClient.VerifyCheckResponseDTO verifyResponse =
           postalAdminClient.verifyCheck(postalOrganization, serverName, domain.getName());
       if (verifyResponse.record() != null) {
         applyRecord(
@@ -254,19 +254,19 @@ public class DomainService {
     return toResponse(domainRepository.save(domain));
   }
 
-  public DomainJwtSecretResponse getUserJwtSecret(Long ownerId, Long domainId) {
+  public DomainJwtSecretResponseDTO getUserJwtSecret(Long ownerId, Long domainId) {
     accessService.requireDomainAccess(ownerId, domainId);
     String secret = domainJwtSecretService.getOrCreateSecret(domainId);
-    return new DomainJwtSecretResponse(domainId, secret);
+    return new DomainJwtSecretResponseDTO(domainId, secret);
   }
 
-  public DomainJwtSecretResponse rotateUserJwtSecret(Long ownerId, Long domainId) {
+  public DomainJwtSecretResponseDTO rotateUserJwtSecret(Long ownerId, Long domainId) {
     accessService.requireDomainAccess(ownerId, domainId);
     String secret = domainJwtSecretService.rotateSecret(domainId);
-    return new DomainJwtSecretResponse(domainId, secret);
+    return new DomainJwtSecretResponseDTO(domainId, secret);
   }
 
-  public DomainApiTokenResponse generateDomainApiToken(Long ownerId, Long domainId, Long expiresSeconds) {
+  public DomainApiTokenResponseDTO generateDomainApiToken(Long ownerId, Long domainId, Long expiresSeconds) {
     accessService.requireDomainAccess(ownerId, domainId);
     return domainApiTokenService.generate(domainId, expiresSeconds);
   }
@@ -274,7 +274,7 @@ public class DomainService {
   @Transactional
   public void delete(Long ownerId, Long domainId) {
     accessService.requireDomainAccess(ownerId, domainId);
-    Domain domain = domainRepository.findById(domainId)
+    DomainEntity domain = domainRepository.findById(domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found"));
     userSocialIdentityRepository.deleteByDomainId(domainId);
     domainSocialProviderConfigRepository.deleteByDomainId(domainId);
@@ -282,11 +282,11 @@ public class DomainService {
     domainRepository.delete(domain);
   }
 
-  private void linkDomain(Owner user, Domain domain) {
+  private void linkDomain(OwnerEntity user, DomainEntity domain) {
     if (ownerDomainRepository.existsByOwnerIdAndDomainId(user.getId(), domain.getId())) {
       return;
     }
-    OwnerDomain link = OwnerDomain.builder()
+    OwnerDomainEntity link = OwnerDomainEntity.builder()
         .owner(user)
         .domain(domain)
         .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
@@ -295,9 +295,9 @@ public class DomainService {
   }
 
 
-  private DomainResponse toResponse(Domain domain) {
+  private DomainResponseDTO toResponse(DomainEntity domain) {
     boolean verified = Boolean.TRUE.equals(domain.getVerifyStt());
-    return new DomainResponse(
+    return new DomainResponseDTO(
         domain.getId(),
         domain.getName(),
         domain.getDnsStatus(),
@@ -327,11 +327,11 @@ public class DomainService {
     );
   }
 
-  private void populateDns(Domain domain, boolean preserveStatusesOnSame) {
+  private void populateDns(DomainEntity domain, boolean preserveStatusesOnSame) {
     try {
       log.info("DNS provision start domainId={} name={}", domain.getId(), domain.getName());
       String serverName = buildServerName(domain.getName());
-      PostalAdminClient.ProvisionResponse response = postalAdminClient.provisionDomain(
+      PostalAdminClient.ProvisionResponseDTO response = postalAdminClient.provisionDomain(
           postalOrganization,
           postalTemplateServer,
           serverName,

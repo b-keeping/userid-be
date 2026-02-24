@@ -1,14 +1,14 @@
 package com.userid.api.domain;
 
-import com.userid.api.common.ApiMessage;
-import com.userid.api.client.AuthServerSocialProvider;
-import com.userid.api.client.DomainSocialProviderConfigRequest;
-import com.userid.api.client.DomainSocialProviderConfigResponse;
+import com.userid.api.common.ApiMessageDTO;
+import com.userid.api.client.AuthServerSocialProviderEnum;
+import com.userid.api.client.DomainSocialProviderConfigRequestDTO;
+import com.userid.api.client.DomainSocialProviderConfigResponseDTO;
 import com.userid.api.client.UseridApiEndpoints;
-import com.userid.api.domain.DomainApiTokenRequest;
-import com.userid.api.domain.DomainApiTokenResponse;
-import com.userid.api.domain.DomainJwtSecretResponse;
-import com.userid.security.AuthPrincipal;
+import com.userid.api.domain.DomainApiTokenRequestDTO;
+import com.userid.api.domain.DomainApiTokenResponseDTO;
+import com.userid.api.domain.DomainJwtSecretResponseDTO;
+import com.userid.security.AuthPrincipalDTO;
 import com.userid.service.DomainService;
 import com.userid.service.DomainSocialProviderConfigService;
 import jakarta.validation.Valid;
@@ -34,82 +34,82 @@ public class DomainController {
   private final DomainSocialProviderConfigService domainSocialProviderConfigService;
 
   @PostMapping
-  public DomainResponse create(
-      @AuthenticationPrincipal AuthPrincipal principal,
-      @Valid @RequestBody DomainRequest request
+  public DomainResponseDTO create(
+      @AuthenticationPrincipal AuthPrincipalDTO principal,
+      @Valid @RequestBody DomainRequestDTO request
   ) {
     return domainService.create(principal.id(), request);
   }
 
   @GetMapping
-  public List<DomainResponse> list(
-      @AuthenticationPrincipal AuthPrincipal principal
+  public List<DomainResponseDTO> list(
+      @AuthenticationPrincipal AuthPrincipalDTO principal
   ) {
     return domainService.list(principal.id());
   }
 
   @PutMapping("/{domainId}")
-  public DomainResponse update(
-      @AuthenticationPrincipal AuthPrincipal principal,
+  public DomainResponseDTO update(
+      @AuthenticationPrincipal AuthPrincipalDTO principal,
       @PathVariable Long domainId,
-      @RequestBody DomainUpdateRequest request
+      @RequestBody DomainUpdateRequestDTO request
   ) {
     return domainService.update(principal.id(), domainId, request);
   }
 
   @PostMapping("/{domainId}/dns-check")
-  public DomainResponse dnsCheck(
-      @AuthenticationPrincipal AuthPrincipal principal,
+  public DomainResponseDTO dnsCheck(
+      @AuthenticationPrincipal AuthPrincipalDTO principal,
       @PathVariable Long domainId
   ) {
     return domainService.checkDns(principal.id(), domainId);
   }
 
   @PostMapping("/{domainId}/verify")
-  public DomainResponse verify(
-      @AuthenticationPrincipal AuthPrincipal principal,
+  public DomainResponseDTO verify(
+      @AuthenticationPrincipal AuthPrincipalDTO principal,
       @PathVariable Long domainId
   ) {
     return domainService.verifyDomain(principal.id(), domainId);
   }
 
   @PostMapping("/{domainId}/smtp-reset")
-  public DomainResponse resetSmtp(
-      @AuthenticationPrincipal AuthPrincipal principal,
+  public DomainResponseDTO resetSmtp(
+      @AuthenticationPrincipal AuthPrincipalDTO principal,
       @PathVariable Long domainId
   ) {
     return domainService.resetSmtp(principal.id(), domainId);
   }
 
   @GetMapping("/{domainId}/user-jwt-secret")
-  public DomainJwtSecretResponse getUserJwtSecret(
-      @AuthenticationPrincipal AuthPrincipal principal,
+  public DomainJwtSecretResponseDTO getUserJwtSecret(
+      @AuthenticationPrincipal AuthPrincipalDTO principal,
       @PathVariable Long domainId
   ) {
     return domainService.getUserJwtSecret(principal.id(), domainId);
   }
 
   @PostMapping("/{domainId}/user-jwt-secret/rotate")
-  public DomainJwtSecretResponse rotateUserJwtSecret(
-      @AuthenticationPrincipal AuthPrincipal principal,
+  public DomainJwtSecretResponseDTO rotateUserJwtSecret(
+      @AuthenticationPrincipal AuthPrincipalDTO principal,
       @PathVariable Long domainId
   ) {
     return domainService.rotateUserJwtSecret(principal.id(), domainId);
   }
 
   @PostMapping("/{domainId}/domain-api-token")
-  public DomainApiTokenResponse domainApiToken(
-      @AuthenticationPrincipal AuthPrincipal principal,
+  public DomainApiTokenResponseDTO domainApiToken(
+      @AuthenticationPrincipal AuthPrincipalDTO principal,
       @PathVariable Long domainId,
-      @RequestBody DomainApiTokenRequest request
+      @RequestBody DomainApiTokenRequestDTO request
   ) {
     Long expiresSeconds = request == null ? null : request.expiresSeconds();
     return domainService.generateDomainApiToken(principal.id(), domainId, expiresSeconds);
   }
 
   @GetMapping(UseridApiEndpoints.DOMAIN_SOCIAL_PROVIDER_CONFIG)
-  public DomainSocialProviderConfigResponse getSocialProviderConfig(
-      @AuthenticationPrincipal AuthPrincipal principal,
+  public DomainSocialProviderConfigResponseDTO getSocialProviderConfig(
+      @AuthenticationPrincipal AuthPrincipalDTO principal,
       @PathVariable Long domainId,
       @PathVariable String provider
   ) {
@@ -120,11 +120,11 @@ public class DomainController {
   }
 
   @PutMapping(UseridApiEndpoints.DOMAIN_SOCIAL_PROVIDER_CONFIG)
-  public DomainSocialProviderConfigResponse updateSocialProviderConfig(
-      @AuthenticationPrincipal AuthPrincipal principal,
+  public DomainSocialProviderConfigResponseDTO updateSocialProviderConfig(
+      @AuthenticationPrincipal AuthPrincipalDTO principal,
       @PathVariable Long domainId,
       @PathVariable String provider,
-      @RequestBody DomainSocialProviderConfigRequest request
+      @RequestBody DomainSocialProviderConfigRequestDTO request
   ) {
     return domainSocialProviderConfigService.upsert(
         principal.id(),
@@ -134,17 +134,17 @@ public class DomainController {
   }
 
   @DeleteMapping("/{domainId}")
-  public ApiMessage delete(
-      @AuthenticationPrincipal AuthPrincipal principal,
+  public ApiMessageDTO delete(
+      @AuthenticationPrincipal AuthPrincipalDTO principal,
       @PathVariable Long domainId
   ) {
     domainService.delete(principal.id(), domainId);
-    return new ApiMessage("ok");
+    return new ApiMessageDTO("ok");
   }
 
-  private AuthServerSocialProvider parseProvider(String provider) {
+  private AuthServerSocialProviderEnum parseProvider(String provider) {
     try {
-      return AuthServerSocialProvider.fromPath(provider);
+      return AuthServerSocialProviderEnum.fromPath(provider);
     } catch (IllegalArgumentException ex) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage());
     }

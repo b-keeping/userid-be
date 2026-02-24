@@ -32,7 +32,7 @@ public class AuthServerApiClient {
     return properties.isEnabled();
   }
 
-  public AuthServerLoginResponse register(AuthServerRegisterRequest request) {
+  public AuthServerLoginResponseDTO register(AuthServerRegisterRequestDTO request) {
     if (!properties.isEnabled()) {
       return null;
     }
@@ -51,11 +51,11 @@ public class AuthServerApiClient {
         valuesCount);
 
     try {
-      AuthServerLoginResponse response = restTemplate.exchange(
+      AuthServerLoginResponseDTO response = restTemplate.exchange(
           endpoint,
           HttpMethod.POST,
           new HttpEntity<>(request, requestHeaders()),
-          AuthServerLoginResponse.class)
+          AuthServerLoginResponseDTO.class)
           .getBody();
       log.info(
           "Auth server register success domainId={} email={} hasToken={}",
@@ -82,7 +82,7 @@ public class AuthServerApiClient {
     }
   }
 
-  public AuthServerLoginResponse confirm(String code) {
+  public AuthServerLoginResponseDTO confirm(String code) {
     if (!properties.isEnabled()) {
       return null;
     }
@@ -100,11 +100,11 @@ public class AuthServerApiClient {
         codeLength);
 
     try {
-      AuthServerLoginResponse response = restTemplate.exchange(
+      AuthServerLoginResponseDTO response = restTemplate.exchange(
           endpoint,
           HttpMethod.POST,
-          new HttpEntity<>(new AuthServerConfirmRequest(code), requestHeaders()),
-          AuthServerLoginResponse.class)
+          new HttpEntity<>(new AuthServerConfirmRequestDTO(code), requestHeaders()),
+          AuthServerLoginResponseDTO.class)
           .getBody();
       log.info(
           "Auth server confirm success domainId={} codeLength={} hasToken={}",
@@ -129,7 +129,7 @@ public class AuthServerApiClient {
     }
   }
 
-  public AuthServerLoginResponse login(AuthServerLoginRequest request) {
+  public AuthServerLoginResponseDTO login(AuthServerLoginRequestDTO request) {
     if (!properties.isEnabled()) {
       return null;
     }
@@ -146,11 +146,11 @@ public class AuthServerApiClient {
         request.email());
 
     try {
-      AuthServerLoginResponse response = restTemplate.exchange(
+      AuthServerLoginResponseDTO response = restTemplate.exchange(
               endpoint,
               HttpMethod.POST,
               new HttpEntity<>(request, requestHeaders()),
-              AuthServerLoginResponse.class)
+              AuthServerLoginResponseDTO.class)
           .getBody();
       log.info(
           "Auth server login success domainId={} email={} hasToken={}",
@@ -187,9 +187,9 @@ public class AuthServerApiClient {
     }
   }
 
-  public AuthServerLoginResponse loginWithSocial(
-      AuthServerSocialProvider provider,
-      AuthServerSocialLoginRequest request
+  public AuthServerLoginResponseDTO loginWithSocial(
+      AuthServerSocialProviderEnum provider,
+      AuthServerSocialLoginRequestDTO request
   ) {
     if (!properties.isEnabled()) {
       return null;
@@ -213,18 +213,18 @@ public class AuthServerApiClient {
         provider.pathValue());
 
     try {
-      AuthServerLoginResponse response = restTemplate.exchange(
+      AuthServerLoginResponseDTO response = restTemplate.exchange(
               endpoint,
               HttpMethod.POST,
               new HttpEntity<>(
-                  new AuthServerSocialAuthRequest(
+                  new AuthServerSocialAuthRequestDTO(
                       provider.pathValue(),
                       request.code().trim(),
                       request.codeVerifier(),
                       request.deviceId(),
                       request.state()),
                   requestHeaders()),
-              AuthServerLoginResponse.class)
+              AuthServerLoginResponseDTO.class)
           .getBody();
       log.info(
           "Auth server social-login success domainId={} provider={} hasToken={}",
@@ -251,9 +251,9 @@ public class AuthServerApiClient {
     }
   }
 
-  public DomainSocialProviderConfigResponse getSocialProviderConfig(AuthServerSocialProvider provider) {
+  public DomainSocialProviderConfigResponseDTO getSocialProviderConfig(AuthServerSocialProviderEnum provider) {
     if (!properties.isEnabled()) {
-      return new DomainSocialProviderConfigResponse(
+      return new DomainSocialProviderConfigResponseDTO(
           provider == null ? null : provider.pathValue(),
           false,
           null,
@@ -276,14 +276,14 @@ public class AuthServerApiClient {
         provider.pathValue());
 
     try {
-      DomainSocialProviderConfigResponse response = restTemplate.exchange(
+      DomainSocialProviderConfigResponseDTO response = restTemplate.exchange(
               endpoint,
               HttpMethod.GET,
               new HttpEntity<>(requestHeaders()),
-              DomainSocialProviderConfigResponse.class)
+              DomainSocialProviderConfigResponseDTO.class)
           .getBody();
       if (response == null) {
-        return new DomainSocialProviderConfigResponse(provider.pathValue(), false, null, false, null);
+        return new DomainSocialProviderConfigResponseDTO(provider.pathValue(), false, null, false, null);
       }
       log.info(
           "Auth server social-config success domainId={} provider={} enabled={} callbackUri={}",
@@ -311,7 +311,7 @@ public class AuthServerApiClient {
     }
   }
 
-  public void forgotPassword(AuthServerForgotPasswordRequest request) {
+  public void forgotPassword(AuthServerForgotPasswordRequestDTO request) {
     if (!properties.isEnabled()) {
       return;
     }
@@ -356,7 +356,7 @@ public class AuthServerApiClient {
     }
   }
 
-  public void resetPassword(AuthServerResetPasswordRequest request) {
+  public void resetPassword(AuthServerResetPasswordRequestDTO request) {
     if (!properties.isEnabled()) {
       return;
     }
@@ -400,7 +400,7 @@ public class AuthServerApiClient {
     }
   }
 
-  public void updateSelf(String userJwtToken, AuthServerUserSelfUpdateRequest request) {
+  public void updateSelf(String userJwtToken, AuthServerUserSelfUpdateRequestDTO request) {
     if (!properties.isEnabled()) {
       return;
     }

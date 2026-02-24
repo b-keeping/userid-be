@@ -1,8 +1,8 @@
 package com.userid.service;
 
-import com.userid.dal.entity.OtpOwner;
-import com.userid.dal.entity.OtpType;
-import com.userid.dal.entity.Owner;
+import com.userid.dal.entity.OtpOwnerEntity;
+import com.userid.dal.entity.OtpTypeEnum;
+import com.userid.dal.entity.OwnerEntity;
 import com.userid.dal.repo.OtpOwnerRepository;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -28,19 +28,19 @@ public class OwnerOtpService {
     this.resetHours = resetHours;
   }
 
-  public String createVerificationCode(Owner owner) {
-    return createCode(owner, OtpType.VERIFICATION, verificationHours);
+  public String createVerificationCode(OwnerEntity owner) {
+    return createCode(owner, OtpTypeEnum.VERIFICATION, verificationHours);
   }
 
-  public String createResetCode(Owner owner) {
-    return createCode(owner, OtpType.RESET, resetHours);
+  public String createResetCode(OwnerEntity owner) {
+    return createCode(owner, OtpTypeEnum.RESET, resetHours);
   }
 
-  public OtpOwner requireValid(OtpType type, String code) {
+  public OtpOwnerEntity requireValid(OtpTypeEnum type, String code) {
     if (code == null || code.isBlank()) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or expired code");
     }
-    OtpOwner otp = otpOwnerRepository.findByCodeAndType(code, type)
+    OtpOwnerEntity otp = otpOwnerRepository.findByCodeAndType(code, type)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or expired code"));
     if (OffsetDateTime.now(ZoneOffset.UTC).isAfter(otp.getExpiresAt())) {
       otpOwnerRepository.deleteByOwnerIdAndType(otp.getOwner().getId(), type);
@@ -49,15 +49,15 @@ public class OwnerOtpService {
     return otp;
   }
 
-  public void clearVerificationCode(Owner owner) {
-    otpOwnerRepository.deleteByOwnerIdAndType(owner.getId(), OtpType.VERIFICATION);
+  public void clearVerificationCode(OwnerEntity owner) {
+    otpOwnerRepository.deleteByOwnerIdAndType(owner.getId(), OtpTypeEnum.VERIFICATION);
   }
 
-  public void clearResetCode(Owner owner) {
-    otpOwnerRepository.deleteByOwnerIdAndType(owner.getId(), OtpType.RESET);
+  public void clearResetCode(OwnerEntity owner) {
+    otpOwnerRepository.deleteByOwnerIdAndType(owner.getId(), OtpTypeEnum.RESET);
   }
 
-  public void clearAllCodes(Owner owner) {
+  public void clearAllCodes(OwnerEntity owner) {
     otpOwnerRepository.deleteByOwnerId(owner.getId());
   }
 
@@ -69,7 +69,7 @@ public class OwnerOtpService {
     return UUID.randomUUID().toString().replace("-", "");
   }
 
-  private String createCode(Owner owner, OtpType type, long hours) {
+  private String createCode(OwnerEntity owner, OtpTypeEnum type, long hours) {
     if (owner.getId() == null) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Owner must be saved before OTP");
     }
@@ -85,7 +85,7 @@ public class OwnerOtpService {
     if (code == null) {
       throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to generate OTP");
     }
-    OtpOwner otp = OtpOwner.builder()
+    OtpOwnerEntity otp = OtpOwnerEntity.builder()
         .owner(owner)
         .type(type)
         .code(code)

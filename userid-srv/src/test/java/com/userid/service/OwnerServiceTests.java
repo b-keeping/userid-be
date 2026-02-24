@@ -3,8 +3,8 @@ package com.userid.service;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.userid.dal.entity.Owner;
-import com.userid.dal.entity.OwnerRole;
+import com.userid.dal.entity.OwnerEntity;
+import com.userid.dal.entity.OwnerRoleEnum;
 import com.userid.dal.repo.DomainRepository;
 import com.userid.dal.repo.OwnerDomainRepository;
 import com.userid.dal.repo.OwnerRepository;
@@ -52,18 +52,18 @@ class OwnerServiceTests {
 
   @Test
   void deleteRemovesOwnerSocialIdentitiesBeforeOwnerDelete() {
-    Owner admin = Owner.builder()
+    OwnerEntity admin = OwnerEntity.builder()
         .id(1L)
         .email("admin@userid.local")
-        .role(OwnerRole.ADMIN)
+        .role(OwnerRoleEnum.ADMIN)
         .createdAt(OffsetDateTime.now())
         .active(true)
         .build();
 
-    Owner target = Owner.builder()
+    OwnerEntity target = OwnerEntity.builder()
         .id(3L)
         .email("owner@example.org")
-        .role(OwnerRole.USER)
+        .role(OwnerRoleEnum.USER)
         .createdAt(OffsetDateTime.now())
         .active(true)
         .build();

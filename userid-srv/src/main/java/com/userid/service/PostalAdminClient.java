@@ -44,7 +44,7 @@ public class PostalAdminClient {
         .build();
   }
 
-  public ProvisionResponse provisionDomain(
+  public ProvisionResponseDTO provisionDomain(
       String organization,
       String templateServer,
       String server,
@@ -72,10 +72,10 @@ public class PostalAdminClient {
       smtp = null;
     }
     String error = root.path("error").asText(null);
-    return new ProvisionResponse(ok, records, smtp, error);
+    return new ProvisionResponseDTO(ok, records, smtp, error);
   }
 
-  public VerifyCheckResponse verifyCheck(String organization, String server, String domain) {
+  public VerifyCheckResponseDTO verifyCheck(String organization, String server, String domain) {
     Map<String, Object> payload = new HashMap<>();
     payload.put("organization", organization);
     payload.put("server", server);
@@ -85,10 +85,10 @@ public class PostalAdminClient {
     boolean ok = root.path("ok").asBoolean(false);
     JsonNode record = root.path("record").isMissingNode() ? null : root.path("record");
     String error = root.path("error").asText(null);
-    return new VerifyCheckResponse(ok, record, error);
+    return new VerifyCheckResponseDTO(ok, record, error);
   }
 
-  public DnsCheckResponse dnsCheck(String organization, String server, String domain) {
+  public DnsCheckResponseDTO dnsCheck(String organization, String server, String domain) {
     Map<String, Object> payload = new HashMap<>();
     payload.put("organization", organization);
     payload.put("server", server);
@@ -98,7 +98,7 @@ public class PostalAdminClient {
     boolean ok = root.path("ok").asBoolean(false);
     JsonNode records = root.path("records").isMissingNode() ? null : root.path("records");
     String error = root.path("error").asText(null);
-    return new DnsCheckResponse(ok, records, error);
+    return new DnsCheckResponseDTO(ok, records, error);
   }
 
   private JsonNode postJson(String path, Object payload) {
@@ -128,20 +128,20 @@ public class PostalAdminClient {
     }
   }
 
-  public record ProvisionResponse(
+  public record ProvisionResponseDTO(
       boolean ok,
       JsonNode records,
       JsonNode smtp,
       String error
   ) {}
 
-  public record VerifyCheckResponse(
+  public record VerifyCheckResponseDTO(
       boolean ok,
       JsonNode record,
       String error
   ) {}
 
-  public record DnsCheckResponse(
+  public record DnsCheckResponseDTO(
       boolean ok,
       JsonNode records,
       String error

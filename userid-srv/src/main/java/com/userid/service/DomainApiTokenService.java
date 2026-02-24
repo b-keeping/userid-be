@@ -1,6 +1,6 @@
 package com.userid.service;
 
-import com.userid.api.domain.DomainApiTokenResponse;
+import com.userid.api.domain.DomainApiTokenResponseDTO;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
@@ -27,7 +27,7 @@ public class DomainApiTokenService {
     this.defaultSeconds = defaultSeconds;
   }
 
-  public DomainApiTokenResponse generate(Long domainId, Long expiresSeconds) {
+  public DomainApiTokenResponseDTO generate(Long domainId, Long expiresSeconds) {
     long seconds = expiresSeconds != null ? expiresSeconds : defaultSeconds;
     if (seconds <= 0) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "expiresSeconds must be positive");
@@ -44,6 +44,6 @@ public class DomainApiTokenService {
         .expiration(Date.from(exp))
         .signWith(secretKey)
         .compact();
-    return new DomainApiTokenResponse(token, OffsetDateTime.ofInstant(exp, ZoneOffset.UTC));
+    return new DomainApiTokenResponseDTO(token, OffsetDateTime.ofInstant(exp, ZoneOffset.UTC));
   }
 }

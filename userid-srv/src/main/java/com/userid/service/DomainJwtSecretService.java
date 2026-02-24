@@ -1,6 +1,6 @@
 package com.userid.service;
 
-import com.userid.dal.entity.Domain;
+import com.userid.dal.entity.DomainEntity;
 import com.userid.dal.repo.DomainRepository;
 import java.security.SecureRandom;
 import java.util.Base64;
@@ -15,7 +15,7 @@ public class DomainJwtSecretService {
   private final DomainRepository domainRepository;
   private final SecureRandom random = new SecureRandom();
 
-  public String getOrCreateSecret(Domain domain) {
+  public String getOrCreateSecret(DomainEntity domain) {
     String secret = domain.getUserJwtSecret();
     if (secret != null && !secret.isBlank()) {
       return secret;
@@ -27,7 +27,7 @@ public class DomainJwtSecretService {
   }
 
   public String getSecret(Long domainId) {
-    Domain domain = domainRepository.findById(domainId)
+    DomainEntity domain = domainRepository.findById(domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found"));
     String secret = domain.getUserJwtSecret();
     if (secret == null || secret.isBlank()) {
@@ -37,13 +37,13 @@ public class DomainJwtSecretService {
   }
 
   public String getOrCreateSecret(Long domainId) {
-    Domain domain = domainRepository.findById(domainId)
+    DomainEntity domain = domainRepository.findById(domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found"));
     return getOrCreateSecret(domain);
   }
 
   public String rotateSecret(Long domainId) {
-    Domain domain = domainRepository.findById(domainId)
+    DomainEntity domain = domainRepository.findById(domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found"));
     String generated = generateSecret();
     domain.setUserJwtSecret(generated);

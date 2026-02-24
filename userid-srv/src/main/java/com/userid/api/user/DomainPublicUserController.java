@@ -1,12 +1,12 @@
 package com.userid.api.user;
 
-import com.userid.api.common.ApiMessage;
-import com.userid.api.client.AuthServerSocialAuthRequest;
-import com.userid.api.client.AuthServerSocialLoginRequest;
-import com.userid.api.client.AuthServerSocialProvider;
-import com.userid.api.client.DomainSocialProviderConfigResponse;
+import com.userid.api.common.ApiMessageDTO;
+import com.userid.api.client.AuthServerSocialAuthRequestDTO;
+import com.userid.api.client.AuthServerSocialLoginRequestDTO;
+import com.userid.api.client.AuthServerSocialProviderEnum;
+import com.userid.api.client.DomainSocialProviderConfigResponseDTO;
 import com.userid.api.client.UseridApiEndpoints;
-import com.userid.security.DomainApiPrincipal;
+import com.userid.security.DomainApiPrincipalDTO;
 import com.userid.service.DomainSocialProviderConfigService;
 import com.userid.service.DomainUserAuthService;
 import com.userid.service.DomainUserSocialAuthService;
@@ -31,30 +31,30 @@ public class DomainPublicUserController {
   private final DomainSocialProviderConfigService domainSocialProviderConfigService;
 
   @PostMapping
-  public UserLoginResponse register(
-      @AuthenticationPrincipal DomainApiPrincipal principal,
+  public UserLoginResponseDTO register(
+      @AuthenticationPrincipal DomainApiPrincipalDTO principal,
       @PathVariable Long domainId,
-      @Valid @RequestBody UserRegistrationRequest request
+      @Valid @RequestBody UserRegistrationRequestDTO request
   ) {
     requireDomain(principal, domainId);
     return domainUserAuthService.register(domainId, request);
   }
 
   @PostMapping(UseridApiEndpoints.LOGIN)
-  public UserLoginResponse login(
-      @AuthenticationPrincipal DomainApiPrincipal principal,
+  public UserLoginResponseDTO login(
+      @AuthenticationPrincipal DomainApiPrincipalDTO principal,
       @PathVariable Long domainId,
-      @Valid @RequestBody UserLoginRequest request
+      @Valid @RequestBody UserLoginRequestDTO request
   ) {
     requireDomain(principal, domainId);
     return domainUserAuthService.login(domainId, request);
   }
 
   @PostMapping(UseridApiEndpoints.SOCIAL_LOGIN)
-  public UserLoginResponse socialLogin(
-      @AuthenticationPrincipal DomainApiPrincipal principal,
+  public UserLoginResponseDTO socialLogin(
+      @AuthenticationPrincipal DomainApiPrincipalDTO principal,
       @PathVariable Long domainId,
-      @RequestBody AuthServerSocialAuthRequest request
+      @RequestBody AuthServerSocialAuthRequestDTO request
   ) {
     requireDomain(principal, domainId);
     if (request == null) {
@@ -63,7 +63,7 @@ public class DomainPublicUserController {
     return domainUserSocialAuthService.login(
         domainId,
         parseProvider(request.provider()),
-        new AuthServerSocialLoginRequest(
+        new AuthServerSocialLoginRequestDTO(
             request.code(),
             request.codeVerifier(),
             request.deviceId(),
@@ -71,8 +71,8 @@ public class DomainPublicUserController {
   }
 
   @GetMapping(UseridApiEndpoints.SOCIAL_PROVIDER_CONFIG)
-  public DomainSocialProviderConfigResponse socialProviderConfig(
-      @AuthenticationPrincipal DomainApiPrincipal principal,
+  public DomainSocialProviderConfigResponseDTO socialProviderConfig(
+      @AuthenticationPrincipal DomainApiPrincipalDTO principal,
       @PathVariable Long domainId,
       @PathVariable String provider
   ) {
@@ -83,54 +83,54 @@ public class DomainPublicUserController {
   }
 
   @PostMapping(UseridApiEndpoints.CONFIRM)
-  public UserLoginResponse confirm(
-      @AuthenticationPrincipal DomainApiPrincipal principal,
+  public UserLoginResponseDTO confirm(
+      @AuthenticationPrincipal DomainApiPrincipalDTO principal,
       @PathVariable Long domainId,
-      @Valid @RequestBody UserConfirmRequest request
+      @Valid @RequestBody UserConfirmRequestDTO request
   ) {
     requireDomain(principal, domainId);
     return domainUserAuthService.confirm(domainId, request);
   }
 
   @PostMapping(UseridApiEndpoints.FORGOT_PASSWORD)
-  public ApiMessage forgotPassword(
-      @AuthenticationPrincipal DomainApiPrincipal principal,
+  public ApiMessageDTO forgotPassword(
+      @AuthenticationPrincipal DomainApiPrincipalDTO principal,
       @PathVariable Long domainId,
-      @Valid @RequestBody UserForgotPasswordRequest request
+      @Valid @RequestBody UserForgotPasswordRequestDTO request
   ) {
     requireDomain(principal, domainId);
     return domainUserAuthService.forgotPassword(domainId, request);
   }
 
   @PostMapping(UseridApiEndpoints.RESET_PASSWORD)
-  public ApiMessage resetPassword(
-      @AuthenticationPrincipal DomainApiPrincipal principal,
+  public ApiMessageDTO resetPassword(
+      @AuthenticationPrincipal DomainApiPrincipalDTO principal,
       @PathVariable Long domainId,
-      @Valid @RequestBody UserResetPasswordRequest request
+      @Valid @RequestBody UserResetPasswordRequestDTO request
   ) {
     requireDomain(principal, domainId);
     return domainUserAuthService.resetPassword(domainId, request);
   }
 
   @PostMapping(UseridApiEndpoints.RESEND_VERIFICATION)
-  public ApiMessage resendVerification(
-      @AuthenticationPrincipal DomainApiPrincipal principal,
+  public ApiMessageDTO resendVerification(
+      @AuthenticationPrincipal DomainApiPrincipalDTO principal,
       @PathVariable Long domainId,
-      @Valid @RequestBody UserForgotPasswordRequest request
+      @Valid @RequestBody UserForgotPasswordRequestDTO request
   ) {
     requireDomain(principal, domainId);
     return domainUserAuthService.resendVerification(domainId, request);
   }
 
-  private void requireDomain(DomainApiPrincipal principal, Long domainId) {
+  private void requireDomain(DomainApiPrincipalDTO principal, Long domainId) {
     if (principal == null || !domainId.equals(principal.domainId())) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Domain mismatch");
     }
   }
 
-  private AuthServerSocialProvider parseProvider(String provider) {
+  private AuthServerSocialProviderEnum parseProvider(String provider) {
     try {
-      return AuthServerSocialProvider.fromPath(provider);
+      return AuthServerSocialProviderEnum.fromPath(provider);
     } catch (IllegalArgumentException ex) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage());
     }

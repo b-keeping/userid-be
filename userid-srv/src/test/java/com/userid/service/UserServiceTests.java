@@ -8,9 +8,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.userid.api.user.UserRegistrationRequest;
-import com.userid.dal.entity.Domain;
-import com.userid.dal.entity.User;
+import com.userid.api.user.UserRegistrationRequestDTO;
+import com.userid.dal.entity.DomainEntity;
+import com.userid.dal.entity.UserEntity;
 import com.userid.dal.repo.DomainRepository;
 import com.userid.dal.repo.ProfileFieldRepository;
 import com.userid.dal.repo.UserProfileValueRepository;
@@ -67,9 +67,9 @@ class UserServiceTests {
 
   @Test
   void registerByDomainReturnsConflictWhenExistingUserIsConfirmed() {
-    Domain domain = Domain.builder().id(12L).name("example.org").build();
-    UserRegistrationRequest request = new UserRegistrationRequest("user@example.org", "secret", List.of());
-    User existingConfirmed = User.builder()
+    DomainEntity domain = DomainEntity.builder().id(12L).name("example.org").build();
+    UserRegistrationRequestDTO request = new UserRegistrationRequestDTO("user@example.org", "secret", List.of());
+    UserEntity existingConfirmed = UserEntity.builder()
         .id(101L)
         .domain(domain)
         .email("user@example.org")
@@ -87,17 +87,17 @@ class UserServiceTests {
         .hasMessageContaining(HttpStatus.CONFLICT.toString())
         .hasMessageContaining("User already registered");
 
-    verify(userRepository, never()).saveAndFlush(any(User.class));
-    verify(userOtpService, never()).createVerificationCode(any(User.class));
-    verify(userOtpService, never()).reuseVerificationCode(any(User.class));
+    verify(userRepository, never()).saveAndFlush(any(UserEntity.class));
+    verify(userOtpService, never()).createVerificationCode(any(UserEntity.class));
+    verify(userOtpService, never()).reuseVerificationCode(any(UserEntity.class));
     verify(emailService, never()).sendOtpEmail(any(), any(), any());
   }
 
   @Test
   void registerByDomainUpdatesUnconfirmedUserAndResendsExistingOtp() {
-    Domain domain = Domain.builder().id(12L).name("example.org").build();
-    UserRegistrationRequest request = new UserRegistrationRequest("user@example.org", "secret", List.of());
-    User existingUnconfirmed = User.builder()
+    DomainEntity domain = DomainEntity.builder().id(12L).name("example.org").build();
+    UserRegistrationRequestDTO request = new UserRegistrationRequestDTO("user@example.org", "secret", List.of());
+    UserEntity existingUnconfirmed = UserEntity.builder()
         .id(101L)
         .domain(domain)
         .email("user@example.org")
@@ -117,7 +117,7 @@ class UserServiceTests {
     userService.registerByDomain(12L, request);
 
     verify(userRepository).saveAndFlush(existingUnconfirmed);
-    verify(userOtpService, never()).createVerificationCode(any(User.class));
+    verify(userOtpService, never()).createVerificationCode(any(UserEntity.class));
     verify(userOtpService).reuseVerificationCode(existingUnconfirmed);
     verify(emailService).sendOtpEmail(eq(domain), eq("user@example.org"), eq("otp-existing"));
   }

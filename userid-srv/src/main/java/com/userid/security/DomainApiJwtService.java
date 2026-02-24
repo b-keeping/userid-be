@@ -24,7 +24,7 @@ public class DomainApiJwtService {
     this.objectMapper = objectMapper;
   }
 
-  public DomainApiPrincipal parseToken(String token) throws JwtException {
+  public DomainApiPrincipalDTO parseToken(String token) throws JwtException {
     log.info("Domain API JWT decode start token={}", tokenFingerprint(token));
     Long domainId = extractDomainId(token);
     log.info("Domain API JWT payload extracted domainId={} token={}", domainId, tokenFingerprint(token));
@@ -59,7 +59,7 @@ public class DomainApiJwtService {
       throw new JwtException("Invalid token type");
     }
     log.info("Domain API JWT decode success domainId={} token={}", domainId, tokenFingerprint(token));
-    return new DomainApiPrincipal(domainId);
+    return new DomainApiPrincipalDTO(domainId);
   }
 
   private Long extractDomainId(String token) {

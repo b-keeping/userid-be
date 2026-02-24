@@ -1,0 +1,30 @@
+package com.userid.api.domain;
+
+public record DomainResponseDTO(
+    Long id,
+    String name,
+    String dnsStatus,
+    String dnsError,
+    String verify,
+    String verifyHost,
+    String verifyType,
+    Boolean verifyStt,
+    String spf,
+    String spfHost,
+    String spfType,
+    Boolean spfStt,
+    String dkim,
+    String dkimHost,
+    String dkimType,
+    Boolean dkimStt,
+    String mx,
+    String mxHost,
+    String mxType,
+    Integer mxPriority,
+    Boolean mxOptional,
+    Boolean mxStt,
+    String returnPath,
+    String returnPathHost,
+    String returnPathType,
+    Boolean returnPathStt
+) {}

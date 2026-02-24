@@ -6,15 +6,15 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.userid.api.common.ApiMessage;
-import com.userid.api.user.UserConfirmRequest;
-import com.userid.api.user.UserForgotPasswordRequest;
-import com.userid.api.user.UserLoginResponse;
-import com.userid.api.user.UserRegistrationRequest;
-import com.userid.dal.entity.Domain;
-import com.userid.dal.entity.OtpType;
-import com.userid.dal.entity.OtpUser;
-import com.userid.dal.entity.User;
+import com.userid.api.common.ApiMessageDTO;
+import com.userid.api.user.UserConfirmRequestDTO;
+import com.userid.api.user.UserForgotPasswordRequestDTO;
+import com.userid.api.user.UserLoginResponseDTO;
+import com.userid.api.user.UserRegistrationRequestDTO;
+import com.userid.dal.entity.DomainEntity;
+import com.userid.dal.entity.OtpTypeEnum;
+import com.userid.dal.entity.OtpUserEntity;
+import com.userid.dal.entity.UserEntity;
 import com.userid.dal.repo.UserRepository;
 import com.userid.security.DomainUserJwtService;
 import java.time.OffsetDateTime;
@@ -52,19 +52,19 @@ class DomainUserAuthServiceTests {
 
   @Test
   void confirmByCodeMarksEmailAsVerified() {
-    Domain domain = Domain.builder().id(7L).name("example.org").build();
-    User user = User.builder()
+    DomainEntity domain = DomainEntity.builder().id(7L).name("example.org").build();
+    UserEntity user = UserEntity.builder()
         .domain(domain)
         .emailPending("user@example.org")
         .passwordHash("hash")
         .createdAt(OffsetDateTime.now())
         .build();
-    OtpUser otp = OtpUser.builder().user(user).type(OtpType.VERIFICATION).code("abc123").build();
+    OtpUserEntity otp = OtpUserEntity.builder().user(user).type(OtpTypeEnum.VERIFICATION).code("abc123").build();
 
-    when(userOtpService.requireValid(OtpType.VERIFICATION, "abc123")).thenReturn(otp);
+    when(userOtpService.requireValid(OtpTypeEnum.VERIFICATION, "abc123")).thenReturn(otp);
     when(domainUserJwtService.generateToken(user)).thenReturn("jwt-token");
 
-    UserLoginResponse response = domainUserAuthService.confirm(7L, new UserConfirmRequest("abc123"));
+    UserLoginResponseDTO response = domainUserAuthService.confirm(7L, new UserConfirmRequestDTO("abc123"));
 
     assertThat(response.token()).isEqualTo("jwt-token");
     assertThat(response.user()).isNotNull();
@@ -79,26 +79,26 @@ class DomainUserAuthServiceTests {
 
   @Test
   void confirmByCodeRejectsDomainMismatch() {
-    Domain domain = Domain.builder().id(7L).name("example.org").build();
-    User user = User.builder()
+    DomainEntity domain = DomainEntity.builder().id(7L).name("example.org").build();
+    UserEntity user = UserEntity.builder()
         .domain(domain)
         .emailPending("user@example.org")
         .passwordHash("hash")
         .createdAt(OffsetDateTime.now())
         .build();
-    OtpUser otp = OtpUser.builder().user(user).type(OtpType.VERIFICATION).code("abc123").build();
+    OtpUserEntity otp = OtpUserEntity.builder().user(user).type(OtpTypeEnum.VERIFICATION).code("abc123").build();
 
-    when(userOtpService.requireValid(OtpType.VERIFICATION, "abc123")).thenReturn(otp);
+    when(userOtpService.requireValid(OtpTypeEnum.VERIFICATION, "abc123")).thenReturn(otp);
 
-    assertThatThrownBy(() -> domainUserAuthService.confirm(99L, new UserConfirmRequest("abc123")))
+    assertThatThrownBy(() -> domainUserAuthService.confirm(99L, new UserConfirmRequestDTO("abc123")))
         .isInstanceOf(ResponseStatusException.class)
         .hasMessageContaining(HttpStatus.FORBIDDEN.toString());
   }
 
   @Test
   void forgotPasswordWhenEmailNotConfirmedResendsVerificationAndReturnsOk() {
-    Domain domain = Domain.builder().id(7L).name("example.org").build();
-    User user = User.builder()
+    DomainEntity domain = DomainEntity.builder().id(7L).name("example.org").build();
+    UserEntity user = UserEntity.builder()
         .domain(domain)
         .email("user@example.org")
         .emailPending("user@example.org")
@@ -109,7 +109,7 @@ class DomainUserAuthServiceTests {
     when(userRepository.findByDomainIdAndEmail(7L, "user@example.org")).thenReturn(java.util.Optional.of(user));
     when(userOtpService.createVerificationCode(user)).thenReturn("verify-code");
 
-    ApiMessage response = domainUserAuthService.forgotPassword(7L, new UserForgotPasswordRequest("user@example.org"));
+    ApiMessageDTO response = domainUserAuthService.forgotPassword(7L, new UserForgotPasswordRequestDTO("user@example.org"));
 
     assertThat(response.message()).isEqualTo("ok");
     verify(userOtpService).createVerificationCode(user);
@@ -121,8 +121,8 @@ class DomainUserAuthServiceTests {
 
   @Test
   void forgotPasswordWhenEmailConfirmedSendsResetCode() {
-    Domain domain = Domain.builder().id(7L).name("example.org").build();
-    User user = User.builder()
+    DomainEntity domain = DomainEntity.builder().id(7L).name("example.org").build();
+    UserEntity user = UserEntity.builder()
         .domain(domain)
         .email("user@example.org")
         .emailPending("user@example.org")
@@ -133,7 +133,7 @@ class DomainUserAuthServiceTests {
     when(userRepository.findByDomainIdAndEmail(7L, "user@example.org")).thenReturn(java.util.Optional.of(user));
     when(userOtpService.createResetCode(user)).thenReturn("reset-code");
 
-    ApiMessage response = domainUserAuthService.forgotPassword(7L, new UserForgotPasswordRequest("user@example.org"));
+    ApiMessageDTO response = domainUserAuthService.forgotPassword(7L, new UserForgotPasswordRequestDTO("user@example.org"));
 
     assertThat(response.message()).isEqualTo("ok");
     verify(userOtpService).createResetCode(user);
@@ -144,8 +144,8 @@ class DomainUserAuthServiceTests {
 
   @Test
   void registerWhenExistingActiveAndPasswordMatchesReturnsLogin() {
-    Domain domain = Domain.builder().id(7L).name("example.org").build();
-    User user = User.builder()
+    DomainEntity domain = DomainEntity.builder().id(7L).name("example.org").build();
+    UserEntity user = UserEntity.builder()
         .id(10L)
         .domain(domain)
         .email("user@example.org")
@@ -155,7 +155,7 @@ class DomainUserAuthServiceTests {
         .emailVerifiedAt(OffsetDateTime.now())
         .active(true)
         .build();
-    UserRegistrationRequest request = new UserRegistrationRequest("user@example.org", "secret", java.util.List.of());
+    UserRegistrationRequestDTO request = new UserRegistrationRequestDTO("user@example.org", "secret", java.util.List.of());
 
     when(userService.registerByDomain(7L, request))
         .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT, "User already registered"));
@@ -163,7 +163,7 @@ class DomainUserAuthServiceTests {
     when(passwordEncoder.matches("secret", "hash")).thenReturn(true);
     when(domainUserJwtService.generateToken(user)).thenReturn("jwt-token");
 
-    UserLoginResponse response = domainUserAuthService.register(7L, request);
+    UserLoginResponseDTO response = domainUserAuthService.register(7L, request);
 
     assertThat(response.token()).isEqualTo("jwt-token");
     assertThat(response.user()).isNotNull();
@@ -173,8 +173,8 @@ class DomainUserAuthServiceTests {
 
   @Test
   void registerWhenExistingActiveAndPasswordMismatchSendsResetAndReturnsNoToken() {
-    Domain domain = Domain.builder().id(7L).name("example.org").build();
-    User user = User.builder()
+    DomainEntity domain = DomainEntity.builder().id(7L).name("example.org").build();
+    UserEntity user = UserEntity.builder()
         .id(10L)
         .domain(domain)
         .email("user@example.org")
@@ -184,7 +184,7 @@ class DomainUserAuthServiceTests {
         .emailVerifiedAt(OffsetDateTime.now())
         .active(true)
         .build();
-    UserRegistrationRequest request = new UserRegistrationRequest("user@example.org", "secret", java.util.List.of());
+    UserRegistrationRequestDTO request = new UserRegistrationRequestDTO("user@example.org", "secret", java.util.List.of());
 
     when(userService.registerByDomain(7L, request))
         .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT, "User already registered"));
@@ -192,7 +192,7 @@ class DomainUserAuthServiceTests {
     when(passwordEncoder.matches("secret", "hash")).thenReturn(false);
     when(userOtpService.createResetCode(user)).thenReturn("reset-code");
 
-    UserLoginResponse response = domainUserAuthService.register(7L, request);
+    UserLoginResponseDTO response = domainUserAuthService.register(7L, request);
 
     assertThat(response.token()).isNull();
     assertThat(response.user()).isNotNull();

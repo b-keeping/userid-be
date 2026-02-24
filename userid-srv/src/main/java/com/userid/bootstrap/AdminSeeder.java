@@ -1,7 +1,7 @@
 package com.userid.bootstrap;
 
-import com.userid.dal.entity.Owner;
-import com.userid.dal.entity.OwnerRole;
+import com.userid.dal.entity.OwnerEntity;
+import com.userid.dal.entity.OwnerRoleEnum;
 import com.userid.dal.repo.OwnerRepository;
 import com.userid.api.client.EmailNormalizer;
 import java.time.OffsetDateTime;
@@ -22,7 +22,7 @@ public class AdminSeeder implements CommandLineRunner {
 
   @Override
   public void run(String... args) {
-    Owner existing = ownerRepository.findFirstByRole(OwnerRole.ADMIN).orElse(null);
+    OwnerEntity existing = ownerRepository.findFirstByRole(OwnerRoleEnum.ADMIN).orElse(null);
     if (existing != null) {
       boolean changed = false;
       if (existing.getEmail() == null || existing.getEmail().isBlank()) {
@@ -46,10 +46,10 @@ public class AdminSeeder implements CommandLineRunner {
       return;
     }
 
-    Owner admin = Owner.builder()
+    OwnerEntity admin = OwnerEntity.builder()
         .email(EmailNormalizer.normalizeNullable(DEFAULT_ADMIN_EMAIL))
         .passwordHash(passwordEncoder.encode(DEFAULT_ADMIN_PASSWORD))
-        .role(OwnerRole.ADMIN)
+        .role(OwnerRoleEnum.ADMIN)
         .createdAt(OffsetDateTime.now(ZoneOffset.UTC))
         .active(true)
         .emailVerifiedAt(OffsetDateTime.now(ZoneOffset.UTC))

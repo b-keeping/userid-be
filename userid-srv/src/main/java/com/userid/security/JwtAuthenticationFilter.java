@@ -46,7 +46,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     try {
-      AuthPrincipal principal = jwtService.parseToken(token);
+      AuthPrincipalDTO principal = jwtService.parseToken(token);
       var authorities = List.of(new SimpleGrantedAuthority("ROLE_" + principal.role().name()));
       var authentication = new UsernamePasswordAuthenticationToken(principal, token, authorities);
       SecurityContextHolder.getContext().setAuthentication(authentication);

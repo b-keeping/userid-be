@@ -1,20 +1,20 @@
 package com.userid.service;
 
-import com.userid.api.user.UserProfileFilterRequest;
-import com.userid.api.user.UserProfileValueRequest;
-import com.userid.api.user.UserProfileValueResponse;
-import com.userid.api.user.UserRegistrationRequest;
-import com.userid.api.user.UserResponse;
-import com.userid.api.user.UserSearchRequest;
-import com.userid.api.user.UserUpdateRequest;
+import com.userid.api.user.UserProfileFilterRequestDTO;
+import com.userid.api.user.UserProfileValueRequestDTO;
+import com.userid.api.user.UserProfileValueResponseDTO;
+import com.userid.api.user.UserRegistrationRequestDTO;
+import com.userid.api.user.UserResponseDTO;
+import com.userid.api.user.UserSearchRequestDTO;
+import com.userid.api.user.UserUpdateRequestDTO;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.userid.dal.entity.Domain;
-import com.userid.dal.entity.FieldType;
-import com.userid.dal.entity.ProfileField;
-import com.userid.dal.entity.User;
-import com.userid.dal.entity.UserProfileValue;
+import com.userid.dal.entity.DomainEntity;
+import com.userid.dal.entity.FieldTypeEnum;
+import com.userid.dal.entity.ProfileFieldEntity;
+import com.userid.dal.entity.UserEntity;
+import com.userid.dal.entity.UserProfileValueEntity;
 import com.userid.dal.repo.DomainRepository;
 import com.userid.dal.repo.ProfileFieldRepository;
 import com.userid.dal.repo.UserProfileValueRepository;
@@ -57,49 +57,49 @@ public class UserService {
   private final UserOtpService userOtpService;
 
   @Transactional
-  public UserResponse register(Long serviceUserId, Long domainId, UserRegistrationRequest request) {
+  public UserResponseDTO register(Long serviceUserId, Long domainId, UserRegistrationRequestDTO request) {
     accessService.requireDomainAccess(serviceUserId, domainId);
     log.info("DB call domainRepository.findById domainId={} source=register", domainId);
-    Domain domain = domainRepository.findById(domainId)
+    DomainEntity domain = domainRepository.findById(domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found"));
     return registerInternal(domain, request);
   }
 
   @Transactional
-  public UserResponse registerByDomain(Long domainId, UserRegistrationRequest request) {
+  public UserResponseDTO registerByDomain(Long domainId, UserRegistrationRequestDTO request) {
     log.info("DB call domainRepository.findById domainId={} source=registerByDomain", domainId);
-    Domain domain = domainRepository.findById(domainId)
+    DomainEntity domain = domainRepository.findById(domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found"));
     return registerInternal(domain, request);
   }
 
-  public UserResponse get(Long serviceUserId, Long domainId, Long userId) {
+  public UserResponseDTO get(Long serviceUserId, Long domainId, Long userId) {
     accessService.requireDomainAccess(serviceUserId, domainId);
     log.info("DB call userRepository.findByIdAndDomainId userId={} domainId={} source=get", userId, domainId);
-    User user = userRepository.findByIdAndDomainId(userId, domainId)
+    UserEntity user = userRepository.findByIdAndDomainId(userId, domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     return toResponse(user);
   }
 
-  public List<UserResponse> search(Long serviceUserId, Long domainId, UserSearchRequest request) {
+  public List<UserResponseDTO> search(Long serviceUserId, Long domainId, UserSearchRequestDTO request) {
     accessService.requireDomainAccess(serviceUserId, domainId);
     log.info("DB call domainRepository.existsById domainId={} source=search", domainId);
     if (!domainRepository.existsById(domainId)) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found");
     }
-    List<UserProfileFilterRequest> filters = request == null || request.filters() == null
+    List<UserProfileFilterRequestDTO> filters = request == null || request.filters() == null
         ? List.of()
         : request.filters();
 
     log.info("DB call profileFieldRepository.findByDomainId domainId={} source=search", domainId);
-    Map<Long, ProfileField> fieldById = toFieldMap(profileFieldRepository.findByDomainId(domainId));
-    List<UserSearchFilter> resolvedFilters = new ArrayList<>();
+    Map<Long, ProfileFieldEntity> fieldById = toFieldMap(profileFieldRepository.findByDomainId(domainId));
+    List<UserSearchFilterDTO> resolvedFilters = new ArrayList<>();
 
-    for (UserProfileFilterRequest filter : filters) {
+    for (UserProfileFilterRequestDTO filter : filters) {
       if (filter.fieldId() == null) {
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Filter field id is required");
       }
-      ProfileField field = fieldById.get(filter.fieldId());
+      ProfileFieldEntity field = fieldById.get(filter.fieldId());
       if (field == null) {
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown profile field id: " + filter.fieldId());
       }
@@ -110,26 +110,26 @@ public class UserService {
         "DB call userRepository.searchByDomainAndFilters domainId={} filtersCount={} source=search",
         domainId,
         resolvedFilters.size());
-    List<User> users = userRepository.searchByDomainAndFilters(domainId, resolvedFilters);
+    List<UserEntity> users = userRepository.searchByDomainAndFilters(domainId, resolvedFilters);
     return users.stream()
         .map(this::toResponse)
         .collect(Collectors.toList());
   }
 
-  public UserResponse update(Long serviceUserId, Long domainId, Long userId, UserUpdateRequest request) {
+  public UserResponseDTO update(Long serviceUserId, Long domainId, Long userId, UserUpdateRequestDTO request) {
     accessService.requireDomainAccess(serviceUserId, domainId);
     log.info("DB call userRepository.findByIdAndDomainId userId={} domainId={} source=update", userId, domainId);
-    User user = userRepository.findByIdAndDomainId(userId, domainId)
+    UserEntity user = userRepository.findByIdAndDomainId(userId, domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     return updateInternal(user, domainId, request, true);
   }
 
-  public UserResponse updateByDomain(Long domainId, Long userId, UserUpdateRequest request) {
+  public UserResponseDTO updateByDomain(Long domainId, Long userId, UserUpdateRequestDTO request) {
     log.info(
         "DB call userRepository.findByIdAndDomainId userId={} domainId={} source=updateByDomain",
         userId,
         domainId);
-    User user = userRepository.findByIdAndDomainId(userId, domainId)
+    UserEntity user = userRepository.findByIdAndDomainId(userId, domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     return updateInternal(user, domainId, request, false);
   }
@@ -138,7 +138,7 @@ public class UserService {
   public void delete(Long serviceUserId, Long domainId, Long userId) {
     accessService.requireDomainAccess(serviceUserId, domainId);
     log.info("DB call userRepository.findByIdAndDomainId userId={} domainId={} source=delete", userId, domainId);
-    User user = userRepository.findByIdAndDomainId(userId, domainId)
+    UserEntity user = userRepository.findByIdAndDomainId(userId, domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     userOtpService.clearAllCodes(user);
     log.info("DB call userSocialIdentityRepository.deleteByUserId userId={} source=delete", user.getId());
@@ -150,12 +150,12 @@ public class UserService {
   }
 
   @Transactional
-  private UserResponse registerInternal(Domain domain, UserRegistrationRequest request) {
+  private UserResponseDTO registerInternal(DomainEntity domain, UserRegistrationRequestDTO request) {
     Long domainId = domain.getId();
     String email = EmailNormalizer.normalizeNullable(request.email());
-    Optional<User> existingUser = findByDomainAndEmailOrPending(domainId, email);
+    Optional<UserEntity> existingUser = findByDomainAndEmailOrPending(domainId, email);
     if (existingUser.isPresent()) {
-      User existing = existingUser.get();
+      UserEntity existing = existingUser.get();
       if (existing.isActive()) {
         log.warn("DB duplicate user registration domainId={} emailPending={}", domainId, email);
         throw new ResponseStatusException(HttpStatus.CONFLICT, "User already registered");
@@ -168,7 +168,7 @@ public class UserService {
       return refreshUnconfirmedRegistration(existing, domain, request);
     }
 
-    User user = User.builder()
+    UserEntity user = UserEntity.builder()
         .domain(domain)
         .email(email)
         .emailPending(email)
@@ -182,7 +182,7 @@ public class UserService {
         "DB call userRepository.saveAndFlush domainId={} emailPending={} source=registerInternal",
         domainId,
         user.getEmailPending());
-    User saved;
+    UserEntity saved;
     try {
       saved = userRepository.saveAndFlush(user);
     } catch (DataIntegrityViolationException ex) {
@@ -203,7 +203,7 @@ public class UserService {
     return toResponse(saved);
   }
 
-  private UserResponse refreshUnconfirmedRegistration(User user, Domain domain, UserRegistrationRequest request) {
+  private UserResponseDTO refreshUnconfirmedRegistration(UserEntity user, DomainEntity domain, UserRegistrationRequestDTO request) {
     Long domainId = domain.getId();
     String email = EmailNormalizer.normalizeNullable(request.email());
     String currentEmail = resolveDisplayedEmail(user);
@@ -223,7 +223,7 @@ public class UserService {
         domainId,
         user.getEmail(),
         user.getEmailPending());
-    User saved;
+    UserEntity saved;
     try {
       saved = userRepository.saveAndFlush(user);
     } catch (DataIntegrityViolationException ex) {
@@ -245,12 +245,12 @@ public class UserService {
     return toResponse(saved);
   }
 
-  private Optional<User> findByDomainAndEmailOrPending(Long domainId, String email) {
+  private Optional<UserEntity> findByDomainAndEmailOrPending(Long domainId, String email) {
     return userRepository.findByDomainIdAndEmail(domainId, email)
         .or(() -> userRepository.findByDomainIdAndEmailPending(domainId, email));
   }
 
-  private UserResponse updateInternal(User user, Long domainId, UserUpdateRequest request, boolean allowConfirmed) {
+  private UserResponseDTO updateInternal(UserEntity user, Long domainId, UserUpdateRequestDTO request, boolean allowConfirmed) {
     if (!allowConfirmed && request.confirmed() != null) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Confirmed flag is not allowed");
     }
@@ -294,7 +294,7 @@ public class UserService {
         domainId,
         user.getEmail(),
         user.getEmailPending());
-    User saved;
+    UserEntity saved;
     try {
       saved = userRepository.saveAndFlush(user);
     } catch (DataIntegrityViolationException ex) {
@@ -322,30 +322,30 @@ public class UserService {
     return toResponse(saved);
   }
 
-  private Map<Long, ProfileField> toFieldMap(List<ProfileField> fields) {
-    Map<Long, ProfileField> fieldById = new HashMap<>();
-    for (ProfileField field : fields) {
+  private Map<Long, ProfileFieldEntity> toFieldMap(List<ProfileFieldEntity> fields) {
+    Map<Long, ProfileFieldEntity> fieldById = new HashMap<>();
+    for (ProfileFieldEntity field : fields) {
       fieldById.put(field.getId(), field);
     }
     return fieldById;
   }
 
-  void applyProfileValues(User user, Long domainId, List<UserProfileValueRequest> requests) {
+  void applyProfileValues(UserEntity user, Long domainId, List<UserProfileValueRequestDTO> requests) {
     log.info("DB call profileFieldRepository.findByDomainId domainId={} source=applyProfileValues", domainId);
-    List<ProfileField> fields = profileFieldRepository.findByDomainId(domainId);
-    Map<Long, ProfileField> fieldById = toFieldMap(fields);
-    List<UserProfileValueRequest> valueRequests = requests == null ? List.of() : requests;
+    List<ProfileFieldEntity> fields = profileFieldRepository.findByDomainId(domainId);
+    Map<Long, ProfileFieldEntity> fieldById = toFieldMap(fields);
+    List<UserProfileValueRequestDTO> valueRequests = requests == null ? List.of() : requests;
 
-    Set<UserProfileValue> userValues = user.getValues();
-    List<UserProfileValue> existingValues = user.getId() == null
+    Set<UserProfileValueEntity> userValues = user.getValues();
+    List<UserProfileValueEntity> existingValues = user.getId() == null
         ? List.of()
         : loadUserValuesForUpdate(user.getId());
-    for (UserProfileValue existing : existingValues) {
+    for (UserProfileValueEntity existing : existingValues) {
       userValues.add(existing);
     }
 
-    Map<Long, UserProfileValue> valueByFieldId = new HashMap<>();
-    for (UserProfileValue existing : userValues) {
+    Map<Long, UserProfileValueEntity> valueByFieldId = new HashMap<>();
+    for (UserProfileValueEntity existing : userValues) {
       if (existing.getField() != null && existing.getField().getId() != null) {
         valueByFieldId.put(existing.getField().getId(), existing);
       }
@@ -354,13 +354,13 @@ public class UserService {
     Set<Long> providedFieldIds = new HashSet<>();
     List<Long> unknownFieldIds = new ArrayList<>();
 
-    for (UserProfileValueRequest rawRequest : valueRequests) {
-      UserProfileValueRequest valueRequest = stripDisplayName(rawRequest);
+    for (UserProfileValueRequestDTO rawRequest : valueRequests) {
+      UserProfileValueRequestDTO valueRequest = stripDisplayName(rawRequest);
       Long fieldId = valueRequest.fieldId();
       if (fieldId == null) {
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Profile field id is required");
       }
-      ProfileField field = fieldById.get(fieldId);
+      ProfileFieldEntity field = fieldById.get(fieldId);
       if (field == null) {
         unknownFieldIds.add(fieldId);
         continue;
@@ -369,9 +369,9 @@ public class UserService {
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Duplicate profile field id: " + fieldId);
       }
 
-      UserProfileValue value = valueByFieldId.get(fieldId);
+      UserProfileValueEntity value = valueByFieldId.get(fieldId);
       if (value == null) {
-        value = new UserProfileValue();
+        value = new UserProfileValueEntity();
         value.setUser(user);
         value.setField(field);
         userValues.add(value);
@@ -389,11 +389,11 @@ public class UserService {
 
     boolean requireAllMandatory = user.getId() == null;
     List<String> missingMandatory = fields.stream()
-        .filter(ProfileField::isMandatory)
+        .filter(ProfileFieldEntity::isMandatory)
         .filter(field -> requireAllMandatory
             ? !providedFieldIds.contains(field.getId())
             : !providedFieldIds.contains(field.getId()) && !valueByFieldId.containsKey(field.getId()))
-        .map(ProfileField::getName)
+        .map(ProfileFieldEntity::getName)
         .toList();
 
     if (!missingMandatory.isEmpty()) {
@@ -406,7 +406,7 @@ public class UserService {
     user.setProfileJsonb(serializeProfile(new ArrayList<>(valueByFieldId.values())));
   }
 
-  private List<UserProfileValue> loadUserValuesForUpdate(Long userId) {
+  private List<UserProfileValueEntity> loadUserValuesForUpdate(Long userId) {
     log.info("DB call userProfileValueRepository.findByUserId userId={} source=applyProfileValues", userId);
     return userProfileValueRepository.findByUserId(userId);
   }
@@ -423,7 +423,7 @@ public class UserService {
         || normalized.contains("unique index or primary key violation");
   }
 
-  private void applyValue(UserProfileValue value, FieldType type, UserProfileValueRequest request) {
+  private void applyValue(UserProfileValueEntity value, FieldTypeEnum type, UserProfileValueRequestDTO request) {
     switch (type) {
       case STRING -> {
         requireValue(request.stringValue(), "stringValue");
@@ -460,9 +460,9 @@ public class UserService {
     }
   }
 
-  private static UserProfileValueRequest stripDisplayName(UserProfileValueRequest request) {
+  private static UserProfileValueRequestDTO stripDisplayName(UserProfileValueRequestDTO request) {
     // "name" is accepted in incoming JSON for UI/docs convenience and ignored by backend logic.
-    return new UserProfileValueRequest(
+    return new UserProfileValueRequestDTO(
         request.fieldId(),
         null,
         request.stringValue(),
@@ -475,40 +475,40 @@ public class UserService {
         request.timestampValue());
   }
 
-  private UserSearchFilter toSearchFilter(ProfileField field, UserProfileFilterRequest request) {
+  private UserSearchFilterDTO toSearchFilter(ProfileFieldEntity field, UserProfileFilterRequestDTO request) {
     return switch (field.getType()) {
-      case STRING -> new UserSearchFilter(field.getId(), field.getType(),
+      case STRING -> new UserSearchFilterDTO(field.getId(), field.getType(),
           requireValue(request.stringValue(), "stringValue"), null, null, null, null, null, null);
-      case NUMERIC -> new UserSearchFilter(field.getId(), field.getType(),
+      case NUMERIC -> new UserSearchFilterDTO(field.getId(), field.getType(),
           requireDigits(request.numericValue(), "numericValue"), null, null, null, null, null, null);
-      case BOOLEAN -> new UserSearchFilter(field.getId(), field.getType(),
+      case BOOLEAN -> new UserSearchFilterDTO(field.getId(), field.getType(),
           null, requireValue(request.booleanValue(), "booleanValue"), null, null, null, null, null);
-      case INTEGER -> new UserSearchFilter(field.getId(), field.getType(),
+      case INTEGER -> new UserSearchFilterDTO(field.getId(), field.getType(),
           null, null, requireValue(request.integerValue(), "integerValue"), null, null, null, null);
-      case DECIMAL -> new UserSearchFilter(field.getId(), field.getType(),
+      case DECIMAL -> new UserSearchFilterDTO(field.getId(), field.getType(),
           null, null, null, requireValue(request.decimalValue(), "decimalValue"), null, null, null);
-      case DATE -> new UserSearchFilter(field.getId(), field.getType(),
+      case DATE -> new UserSearchFilterDTO(field.getId(), field.getType(),
           null, null, null, null, requireValue(request.dateValue(), "dateValue"), null, null);
-      case TIME -> new UserSearchFilter(field.getId(), field.getType(),
+      case TIME -> new UserSearchFilterDTO(field.getId(), field.getType(),
           null, null, null, null, null, requireValue(request.timeValue(), "timeValue"), null);
-      case TIMESTAMP -> new UserSearchFilter(field.getId(), field.getType(),
+      case TIMESTAMP -> new UserSearchFilterDTO(field.getId(), field.getType(),
           null, null, null, null, null, null, requireValue(request.timestampValue(), "timestampValue"));
     };
   }
 
-  UserResponse toResponse(User user) {
-    List<UserProfileValueResponse> values = parseProfile(user.getProfileJsonb());
+  UserResponseDTO toResponse(UserEntity user) {
+    List<UserProfileValueResponseDTO> values = parseProfile(user.getProfileJsonb());
     if (values == null) {
       values = user.getValues().stream()
           .sorted(Comparator
-              .comparing((UserProfileValue v) -> v.getField().getSortOrder(), Comparator.nullsLast(Integer::compareTo))
+              .comparing((UserProfileValueEntity v) -> v.getField().getSortOrder(), Comparator.nullsLast(Integer::compareTo))
               .thenComparing(v -> v.getField().getId()))
           .map(this::toResponse)
           .collect(Collectors.toList());
     }
 
     boolean confirmed = user.getEmailVerifiedAt() != null;
-    return new UserResponse(
+    return new UserResponseDTO(
         user.getId(),
         resolveDisplayedEmail(user),
         confirmed,
@@ -517,14 +517,14 @@ public class UserService {
         values);
   }
 
-  private String resolveDisplayedEmail(User user) {
+  private String resolveDisplayedEmail(UserEntity user) {
     if (user.getEmail() != null && !user.getEmail().isBlank()) {
       return user.getEmail();
     }
     return user.getEmailPending();
   }
 
-  private String resolveVerificationEmail(User user) {
+  private String resolveVerificationEmail(UserEntity user) {
     String email = resolveDisplayedEmail(user);
     if (email == null || email.isBlank()) {
       throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "User email is not set");
@@ -532,11 +532,11 @@ public class UserService {
     return email;
   }
 
-  private UserProfileValueResponse toResponse(UserProfileValue value) {
-    ProfileField field = value.getField();
-    String stringValue = field.getType() == FieldType.NUMERIC ? null : value.getValueString();
-    String numericValue = field.getType() == FieldType.NUMERIC ? value.getValueString() : null;
-    return new UserProfileValueResponse(
+  private UserProfileValueResponseDTO toResponse(UserProfileValueEntity value) {
+    ProfileFieldEntity field = value.getField();
+    String stringValue = field.getType() == FieldTypeEnum.NUMERIC ? null : value.getValueString();
+    String numericValue = field.getType() == FieldTypeEnum.NUMERIC ? value.getValueString() : null;
+    return new UserProfileValueResponseDTO(
         field.getId(),
         field.getName(),
         field.getType(),
@@ -579,17 +579,17 @@ public class UserService {
     return password;
   }
 
-  private JsonNode serializeProfile(List<UserProfileValue> values) {
-    List<UserProfileValueResponse> snapshot = values.stream()
+  private JsonNode serializeProfile(List<UserProfileValueEntity> values) {
+    List<UserProfileValueResponseDTO> snapshot = values.stream()
         .sorted(Comparator
-            .comparing((UserProfileValue v) -> v.getField().getSortOrder(), Comparator.nullsLast(Integer::compareTo))
+            .comparing((UserProfileValueEntity v) -> v.getField().getSortOrder(), Comparator.nullsLast(Integer::compareTo))
             .thenComparing(v -> v.getField().getId()))
         .map(this::toResponse)
         .collect(Collectors.toList());
     return objectMapper.valueToTree(snapshot);
   }
 
-  private List<UserProfileValueResponse> parseProfile(JsonNode json) {
+  private List<UserProfileValueResponseDTO> parseProfile(JsonNode json) {
     if (json == null || json.isNull() || json.isMissingNode()) {
       return List.of();
     }
@@ -600,7 +600,7 @@ public class UserService {
       return null;
     }
     try {
-      return objectMapper.convertValue(json, new TypeReference<List<UserProfileValueResponse>>() {});
+      return objectMapper.convertValue(json, new TypeReference<List<UserProfileValueResponseDTO>>() {});
     } catch (Exception ex) {
       return null;
     }

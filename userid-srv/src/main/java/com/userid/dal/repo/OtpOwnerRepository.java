@@ -1,19 +1,19 @@
 package com.userid.dal.repo;
 
-import com.userid.dal.entity.OtpOwner;
-import com.userid.dal.entity.OtpType;
+import com.userid.dal.entity.OtpOwnerEntity;
+import com.userid.dal.entity.OtpTypeEnum;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.transaction.annotation.Transactional;
 
-public interface OtpOwnerRepository extends JpaRepository<OtpOwner, Long> {
-  Optional<OtpOwner> findByCodeAndType(String code, OtpType type);
+public interface OtpOwnerRepository extends JpaRepository<OtpOwnerEntity, Long> {
+  Optional<OtpOwnerEntity> findByCodeAndType(String code, OtpTypeEnum type);
 
-  boolean existsByCodeAndType(String code, OtpType type);
+  boolean existsByCodeAndType(String code, OtpTypeEnum type);
 
   @Transactional
   void deleteByOwnerId(Long ownerId);
 
   @Transactional
-  void deleteByOwnerIdAndType(Long ownerId, OtpType type);
+  void deleteByOwnerIdAndType(Long ownerId, OtpTypeEnum type);
 }

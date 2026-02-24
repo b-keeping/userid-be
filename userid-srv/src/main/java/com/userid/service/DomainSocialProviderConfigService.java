@@ -1,10 +1,10 @@
 package com.userid.service;
 
-import com.userid.api.client.AuthServerSocialProvider;
-import com.userid.api.client.DomainSocialProviderConfigRequest;
-import com.userid.api.client.DomainSocialProviderConfigResponse;
-import com.userid.dal.entity.Domain;
-import com.userid.dal.entity.DomainSocialProviderConfig;
+import com.userid.api.client.AuthServerSocialProviderEnum;
+import com.userid.api.client.DomainSocialProviderConfigRequestDTO;
+import com.userid.api.client.DomainSocialProviderConfigResponseDTO;
+import com.userid.dal.entity.DomainEntity;
+import com.userid.dal.entity.DomainSocialProviderConfigEntity;
 import com.userid.dal.repo.DomainRepository;
 import com.userid.dal.repo.DomainSocialProviderConfigRepository;
 import lombok.RequiredArgsConstructor;
@@ -20,18 +20,18 @@ public class DomainSocialProviderConfigService {
   private final DomainRepository domainRepository;
   private final DomainSocialProviderConfigRepository domainSocialProviderConfigRepository;
 
-  public DomainSocialProviderConfigResponse get(
+  public DomainSocialProviderConfigResponseDTO get(
       Long ownerId,
       Long domainId,
-      AuthServerSocialProvider provider
+      AuthServerSocialProviderEnum provider
   ) {
     accessService.requireDomainAccess(ownerId, domainId);
 
-    DomainSocialProviderConfig config = domainSocialProviderConfigRepository
+    DomainSocialProviderConfigEntity config = domainSocialProviderConfigRepository
         .findByDomainIdAndProvider(domainId, provider)
         .orElse(null);
     if (config == null) {
-      return new DomainSocialProviderConfigResponse(
+      return new DomainSocialProviderConfigResponseDTO(
           provider.pathValue(),
           false,
           null,
@@ -42,15 +42,15 @@ public class DomainSocialProviderConfigService {
     return toResponse(config);
   }
 
-  public DomainSocialProviderConfigResponse getForDomainApi(
+  public DomainSocialProviderConfigResponseDTO getForDomainApi(
       Long domainId,
-      AuthServerSocialProvider provider
+      AuthServerSocialProviderEnum provider
   ) {
-    DomainSocialProviderConfig config = domainSocialProviderConfigRepository
+    DomainSocialProviderConfigEntity config = domainSocialProviderConfigRepository
         .findByDomainIdAndProvider(domainId, provider)
         .orElse(null);
     if (config == null || !Boolean.TRUE.equals(config.getEnabled())) {
-      return new DomainSocialProviderConfigResponse(
+      return new DomainSocialProviderConfigResponseDTO(
           provider.pathValue(),
           false,
           null,
@@ -61,19 +61,19 @@ public class DomainSocialProviderConfigService {
     return toResponse(config);
   }
 
-  public DomainSocialProviderConfigResponse upsert(
+  public DomainSocialProviderConfigResponseDTO upsert(
       Long ownerId,
       Long domainId,
-      AuthServerSocialProvider provider,
-      DomainSocialProviderConfigRequest request
+      AuthServerSocialProviderEnum provider,
+      DomainSocialProviderConfigRequestDTO request
   ) {
     accessService.requireDomainAccess(ownerId, domainId);
 
-    Domain domain = domainRepository.findById(domainId)
+    DomainEntity domain = domainRepository.findById(domainId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found"));
-    DomainSocialProviderConfig config = domainSocialProviderConfigRepository
+    DomainSocialProviderConfigEntity config = domainSocialProviderConfigRepository
         .findByDomainIdAndProvider(domainId, provider)
-        .orElseGet(() -> DomainSocialProviderConfig.builder()
+        .orElseGet(() -> DomainSocialProviderConfigEntity.builder()
             .domain(domain)
             .provider(provider)
             .enabled(false)
@@ -90,12 +90,12 @@ public class DomainSocialProviderConfigService {
       validateEnabledConfig(config);
     }
 
-    DomainSocialProviderConfig saved = domainSocialProviderConfigRepository.save(config);
+    DomainSocialProviderConfigEntity saved = domainSocialProviderConfigRepository.save(config);
     return toResponse(saved);
   }
 
-  private DomainSocialProviderConfigResponse toResponse(DomainSocialProviderConfig config) {
-    return new DomainSocialProviderConfigResponse(
+  private DomainSocialProviderConfigResponseDTO toResponse(DomainSocialProviderConfigEntity config) {
+    return new DomainSocialProviderConfigResponseDTO(
         config.getProvider().pathValue(),
         Boolean.TRUE.equals(config.getEnabled()),
         config.getClientId(),
@@ -104,7 +104,7 @@ public class DomainSocialProviderConfigService {
     );
   }
 
-  private void validateEnabledConfig(DomainSocialProviderConfig config) {
+  private void validateEnabledConfig(DomainSocialProviderConfigEntity config) {
     if (!StringUtils.hasText(config.getClientId())
         || !StringUtils.hasText(config.getClientSecret())
         || !StringUtils.hasText(config.getCallbackUri())) {

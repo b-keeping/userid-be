@@ -17,10 +17,10 @@ public class DomainUserAuthController {
   private final DomainUserAuthService domainUserAuthService;
 
   @PutMapping(UseridApiEndpoints.ME)
-  public UserResponse updateSelf(
+  public UserResponseDTO updateSelf(
       @PathVariable Long domainId,
       HttpServletRequest request,
-      @RequestBody UserSelfUpdateRequest body
+      @RequestBody UserSelfUpdateRequestDTO body
   ) {
     return domainUserAuthService.updateSelf(domainId, request, body);
   }

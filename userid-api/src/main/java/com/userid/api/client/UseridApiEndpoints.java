@@ -38,7 +38,7 @@ public final class UseridApiEndpoints {
     return externalDomainUsers(domainId) + SOCIAL_LOGIN;
   }
 
-  public static String externalDomainUsersSocialProviderConfig(Long domainId, AuthServerSocialProvider provider) {
+  public static String externalDomainUsersSocialProviderConfig(Long domainId, AuthServerSocialProviderEnum provider) {
     return externalDomainUsers(domainId)
         + "/social/"
         + provider.pathValue()
@@ -57,7 +57,7 @@ public final class UseridApiEndpoints {
     return externalDomainUsers(domainId) + RESET_PASSWORD;
   }
 
-  public static String domainSocialProviderConfig(Long domainId, AuthServerSocialProvider provider) {
+  public static String domainSocialProviderConfig(Long domainId, AuthServerSocialProviderEnum provider) {
     return (DOMAINS_BASE + DOMAIN_SOCIAL_PROVIDER_CONFIG)
         .replace(DOMAIN_ID_PLACEHOLDER, String.valueOf(domainId))
         .replace(PROVIDER_PLACEHOLDER, provider.pathValue());

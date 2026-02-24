@@ -2,7 +2,7 @@ package com.userid.security;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.userid.dal.entity.User;
+import com.userid.dal.entity.UserEntity;
 import com.userid.service.DomainJwtSecretService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -33,7 +33,7 @@ public class DomainUserJwtService {
     this.objectMapper = objectMapper;
   }
 
-  public String generateToken(User user) {
+  public String generateToken(UserEntity user) {
     Instant now = Instant.now();
     String secret = domainJwtSecretService.getOrCreateSecret(user.getDomain());
     SecretKey secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
@@ -47,7 +47,7 @@ public class DomainUserJwtService {
         .compact();
   }
 
-  public DomainUserPrincipal parseToken(String token) throws JwtException {
+  public DomainUserPrincipalDTO parseToken(String token) throws JwtException {
     Long domainId = extractDomainId(token);
     String secret = domainJwtSecretService.getSecret(domainId);
     SecretKey secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
@@ -63,7 +63,7 @@ public class DomainUserJwtService {
     if (tokenDomainId == null || !tokenDomainId.equals(domainId)) {
       throw new JwtException("Invalid domainId");
     }
-    return new DomainUserPrincipal(id, tokenDomainId, email);
+    return new DomainUserPrincipalDTO(id, tokenDomainId, email);
   }
 
   private Long extractDomainId(String token) {
