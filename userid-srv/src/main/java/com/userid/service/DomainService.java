@@ -333,9 +333,12 @@ public class DomainService {
           postalSmtpName
       );
       log.info("DNS provision response domainId={} ok={} error={}", domain.getId(), response.ok(), response.error());
-      if (!preserveStatusesOnSame) {
+      if (response.ok()) {
         domain.setDnsStatus(null);
         domain.setDnsError(null);
+      } else {
+        domain.setDnsStatus("error");
+        domain.setDnsError(firstError(response.error(), "Domain provisioning failed"));
       }
 
       if (response.ok() && response.records() != null) {
