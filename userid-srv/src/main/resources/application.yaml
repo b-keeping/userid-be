@@ -48,6 +48,7 @@ auth:
     organization: ${POSTAL_ORG:Org1}
     template-server: ${POSTAL_TEMPLATE_SERVER:Server1}
     smtp-name: ${DOMAIN_SMTP_LOGIN:}
+    return-path-spf: "${POSTAL_RETURN_PATH_SPF:v=spf1 a:post.userid.sh -all}"
   owner-social:
     google:
       enabled: ${OWNER_SOCIAL_GOOGLE_ENABLED:false}

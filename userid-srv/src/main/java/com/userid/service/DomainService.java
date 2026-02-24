@@ -33,7 +33,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class DomainService {
   private static final Logger log = LoggerFactory.getLogger(DomainService.class);
   private static final String PSRP_HOST_PREFIX = "psrp.";
-  private static final String PSRP_VALUE = "v=spf1 a:post.userid.sh -all";
+  private static final String DEFAULT_RETURN_PATH_SPF = "v=spf1 a:post.userid.sh -all";
   private final DomainRepository domainRepository;
   private final DomainSocialProviderConfigRepository domainSocialProviderConfigRepository;
   private final OwnerDomainRepository ownerDomainRepository;
@@ -50,6 +50,8 @@ public class DomainService {
   private String postalTemplateServer;
   @org.springframework.beans.factory.annotation.Value("${auth.postal-admin.smtp-name:}")
   private String postalSmtpName;
+  @org.springframework.beans.factory.annotation.Value("${auth.postal-admin.return-path-spf:v=spf1 a:post.userid.sh -all}")
+  private String postalReturnPathSpf;
 
   public DomainResponse create(Long ownerId, DomainRequest request) {
     Owner requester = accessService.requireUser(ownerId);
@@ -152,34 +154,37 @@ public class DomainService {
       applyRecord(findRecord(records, "spf"), domain::setSpf, domain::setSpfHost, domain::setSpfType, null, null, domain::setSpfStt);
       applyRecord(findRecord(records, "dkim"), domain::setDkim, domain::setDkimHost, domain::setDkimType, null, null, domain::setDkimStt);
       applyRecord(findRecord(records, "mx"), domain::setMx, domain::setMxHost, domain::setMxType, domain::setMxPriority, domain::setMxOptional, domain::setMxStt);
-      domain.setReturnPath(PSRP_VALUE);
+      String returnPathSpf = returnPathSpfValue();
+      domain.setReturnPath(returnPathSpf);
       domain.setReturnPathHost(psrpHost(domain.getName()));
       domain.setReturnPathType("TXT");
 
       boolean spfOk = requiredRecordOk(records, "spf");
       boolean dkimOk = requiredRecordOk(records, "dkim");
       boolean mxOk = requiredRecordOk(records, "mx");
-      psrpOk = dnsLookupService.hasTxtRecord(psrpHost(domain.getName()), PSRP_VALUE);
+      psrpOk = dnsLookupService.hasTxtRecord(psrpHost(domain.getName()), returnPathSpf);
       domain.setReturnPathStt(psrpOk);
 
       String error = null;
       if (!verifyResponse.ok()) {
         error = appendError(error, firstError(verifyResponse.error(), "Domain verification check failed"));
       }
-      if (records == null && !dnsResponse.ok()) {
+      if (verifyResponse.ok() && records == null && !dnsResponse.ok()) {
         error = appendError(error, firstError(dnsResponse.error(), "DNS check failed"));
       }
-      if (!spfOk) {
-        error = appendError(error, "SPF record is not valid");
-      }
-      if (!dkimOk) {
-        error = appendError(error, "DKIM record is not valid");
-      }
-      if (!mxOk) {
-        error = appendError(error, "MX record is not valid");
-      }
-      if (!psrpOk) {
-        error = appendError(error, returnPathMissingError(domain.getName()));
+      if (verifyResponse.ok()) {
+        if (!spfOk) {
+          error = appendError(error, "SPF record is not valid");
+        }
+        if (!dkimOk) {
+          error = appendError(error, "DKIM record is not valid");
+        }
+        if (!mxOk) {
+          error = appendError(error, "MX record is not valid");
+        }
+        if (!psrpOk) {
+          error = appendError(error, returnPathMissingError(domain.getName()));
+        }
       }
 
       if (error == null) {
@@ -192,8 +197,9 @@ public class DomainService {
     } catch (ResponseStatusException ex) {
       domain.setDnsStatus("error");
       domain.setDnsError(ex.getReason());
-      psrpOk = dnsLookupService.hasTxtRecord(psrpHost(domain.getName()), PSRP_VALUE);
-      domain.setReturnPath(PSRP_VALUE);
+      String returnPathSpf = returnPathSpfValue();
+      psrpOk = dnsLookupService.hasTxtRecord(psrpHost(domain.getName()), returnPathSpf);
+      domain.setReturnPath(returnPathSpf);
       domain.setReturnPathHost(psrpHost(domain.getName()));
       domain.setReturnPathType("TXT");
       domain.setReturnPathStt(psrpOk);
@@ -392,10 +398,11 @@ public class DomainService {
           if (changedDkim) {
             domain.setDkimStt(false);
           }
-          boolean changedReturnPath = !Objects.equals(domain.getReturnPath(), PSRP_VALUE)
+          String returnPathSpf = returnPathSpfValue();
+          boolean changedReturnPath = !Objects.equals(domain.getReturnPath(), returnPathSpf)
               || !Objects.equals(domain.getReturnPathHost(), psrpHost(domain.getName()))
               || !Objects.equals(domain.getReturnPathType(), "TXT");
-          domain.setReturnPath(PSRP_VALUE);
+          domain.setReturnPath(returnPathSpf);
           domain.setReturnPathHost(psrpHost(domain.getName()));
           domain.setReturnPathType("TXT");
           if (changedReturnPath) {
@@ -421,7 +428,7 @@ public class DomainService {
           applyRecord(findRecord(records, "verification"), domain::setVerify, domain::setVerifyHost, domain::setVerifyType, null, null, null);
           applyRecord(findRecord(records, "spf"), domain::setSpf, domain::setSpfHost, domain::setSpfType, null, null, null);
           applyRecord(findRecord(records, "dkim"), domain::setDkim, domain::setDkimHost, domain::setDkimType, null, null, null);
-          domain.setReturnPath(PSRP_VALUE);
+          domain.setReturnPath(returnPathSpfValue());
           domain.setReturnPathHost(psrpHost(domain.getName()));
           domain.setReturnPathType("TXT");
           applyRecord(findRecord(records, "mx"), domain::setMx, domain::setMxHost, domain::setMxType, domain::setMxPriority, domain::setMxOptional, null);
@@ -587,7 +594,14 @@ public class DomainService {
     return PSRP_HOST_PREFIX + domainName;
   }
 
+  private String returnPathSpfValue() {
+    if (postalReturnPathSpf == null || postalReturnPathSpf.isBlank()) {
+      return DEFAULT_RETURN_PATH_SPF;
+    }
+    return postalReturnPathSpf.trim();
+  }
+
   private String returnPathMissingError(String domainName) {
-    return "Return Path TXT " + psrpHost(domainName) + " = " + PSRP_VALUE + " not found";
+    return "Return Path TXT " + psrpHost(domainName) + " = " + returnPathSpfValue() + " not found";
   }
 }
