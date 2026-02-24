@@ -7,4 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface DomainSocialProviderConfigRepository extends JpaRepository<DomainSocialProviderConfig, Long> {
   Optional<DomainSocialProviderConfig> findByDomainIdAndProvider(Long domainId, AuthServerSocialProvider provider);
+
+  void deleteByDomainId(Long domainId);
 }

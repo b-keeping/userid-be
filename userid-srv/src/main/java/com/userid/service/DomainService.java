@@ -11,8 +11,10 @@ import com.userid.dal.entity.Owner;
 import com.userid.dal.entity.OwnerDomain;
 import com.userid.dal.entity.OwnerRole;
 import com.userid.dal.repo.DomainRepository;
+import com.userid.dal.repo.DomainSocialProviderConfigRepository;
 import com.userid.dal.repo.OwnerDomainRepository;
 import com.userid.dal.repo.OwnerRepository;
+import com.userid.dal.repo.UserSocialIdentityRepository;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -33,8 +35,10 @@ public class DomainService {
   private static final String PSRP_HOST_PREFIX = "psrp.";
   private static final String PSRP_VALUE = "v=spf1 a:post.userid.sh -all";
   private final DomainRepository domainRepository;
+  private final DomainSocialProviderConfigRepository domainSocialProviderConfigRepository;
   private final OwnerDomainRepository ownerDomainRepository;
   private final OwnerRepository ownerRepository;
+  private final UserSocialIdentityRepository userSocialIdentityRepository;
   private final AccessService accessService;
   private final PostalAdminClient postalAdminClient;
   private final DnsLookupService dnsLookupService;
@@ -264,11 +268,12 @@ public class DomainService {
   @Transactional
   public void delete(Long ownerId, Long domainId) {
     accessService.requireDomainAccess(ownerId, domainId);
-    if (!domainRepository.existsById(domainId)) {
-      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found");
-    }
+    Domain domain = domainRepository.findById(domainId)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found"));
+    userSocialIdentityRepository.deleteByDomainId(domainId);
+    domainSocialProviderConfigRepository.deleteByDomainId(domainId);
     ownerDomainRepository.deleteByDomainId(domainId);
-    domainRepository.deleteById(domainId);
+    domainRepository.delete(domain);
   }
 
   private void linkDomain(Owner user, Domain domain) {
