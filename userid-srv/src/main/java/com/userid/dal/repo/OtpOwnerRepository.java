@@ -9,6 +9,8 @@ import org.springframework.transaction.annotation.Transactional;
 public interface OtpOwnerRepository extends JpaRepository<OtpOwnerEntity, Long> {
   Optional<OtpOwnerEntity> findByCodeAndType(String code, OtpTypeEnum type);
 
+  Optional<OtpOwnerEntity> findTopByOwnerIdAndTypeOrderByCreatedAtDesc(Long ownerId, OtpTypeEnum type);
+
   boolean existsByCodeAndType(String code, OtpTypeEnum type);
 
   @Transactional

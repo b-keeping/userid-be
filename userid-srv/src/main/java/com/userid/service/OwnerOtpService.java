@@ -32,6 +32,23 @@ public class OwnerOtpService {
     return createCode(owner, OtpTypeEnum.VERIFICATION, verificationHours);
   }
 
+  public String reuseVerificationCode(OwnerEntity owner) {
+    if (owner.getId() == null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Owner must be saved before OTP");
+    }
+    OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+    return otpOwnerRepository.findTopByOwnerIdAndTypeOrderByCreatedAtDesc(owner.getId(), OtpTypeEnum.VERIFICATION)
+        .map(otp -> {
+          if (now.isAfter(otp.getExpiresAt())) {
+            otp.setCreatedAt(now);
+            otp.setExpiresAt(now.plusHours(verificationHours));
+            otpOwnerRepository.save(otp);
+          }
+          return otp.getCode();
+        })
+        .orElseGet(() -> createVerificationCode(owner));
+  }
+
   public String createResetCode(OwnerEntity owner) {
     return createCode(owner, OtpTypeEnum.RESET, resetHours);
   }

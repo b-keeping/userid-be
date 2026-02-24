@@ -88,7 +88,7 @@ class OwnerAuthServiceTests {
 
     when(ownerRepository.findByEmail("owner@identio.ru")).thenReturn(Optional.of(owner));
     when(passwordEncoder.matches("secret", "hash")).thenReturn(true);
-    when(ownerOtpService.createVerificationCode(owner)).thenReturn("verify-code");
+    when(ownerOtpService.reuseVerificationCode(owner)).thenReturn("verify-code");
 
     assertThatThrownBy(() -> ownerAuthService.login(new OwnerLoginRequestDTO("owner@identio.ru", "secret")))
         .isInstanceOfSatisfying(
@@ -98,7 +98,7 @@ class OwnerAuthServiceTests {
               assertThat(ex.getReason()).isEqualTo("Invalid credentials");
             });
 
-    verify(ownerOtpService).createVerificationCode(owner);
+    verify(ownerOtpService).reuseVerificationCode(owner);
     verify(emailService).sendVerificationEmail(
         "owner@identio.ru",
         "https://identio.ru/app/verify?token=verify-code");
@@ -120,7 +120,7 @@ class OwnerAuthServiceTests {
     when(ownerRepository.findByEmail("owner@identio.ru")).thenReturn(Optional.of(existing));
     when(passwordEncoder.encode("new-secret")).thenReturn("new-hash");
     when(ownerRepository.save(existing)).thenReturn(existing);
-    when(ownerOtpService.createVerificationCode(existing)).thenReturn("verify-code");
+    when(ownerOtpService.reuseVerificationCode(existing)).thenReturn("verify-code");
     when(ownerDomainRepository.findByOwnerId(11L)).thenReturn(java.util.List.of());
 
     OwnerResponseDTO response = ownerAuthService.register(new OwnerRegisterRequestDTO("owner@identio.ru", "new-secret"));
@@ -130,7 +130,7 @@ class OwnerAuthServiceTests {
     assertThat(existing.isActive()).isFalse();
     assertThat(existing.getEmailVerifiedAt()).isNull();
     verify(ownerOtpService).clearResetCode(existing);
-    verify(ownerOtpService).createVerificationCode(existing);
+    verify(ownerOtpService).reuseVerificationCode(existing);
     verify(emailService).sendVerificationEmail(
         "owner@identio.ru",
         "https://identio.ru/app/verify?token=verify-code");

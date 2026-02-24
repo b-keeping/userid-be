@@ -152,7 +152,7 @@ public class OwnerAuthService {
       existing.setEmailVerifiedAt(null);
       OwnerEntity saved = ownerRepository.save(existing);
       ownerOtpService.clearResetCode(saved);
-      String code = ownerOtpService.createVerificationCode(saved);
+      String code = ownerOtpService.reuseVerificationCode(saved);
       emailService.sendVerificationEmail(saved.getEmail(), buildVerificationLink(code));
       return toResponse(saved);
     }
@@ -355,7 +355,7 @@ public class OwnerAuthService {
 
   private void resendVerificationEmailBestEffort(OwnerEntity owner) {
     try {
-      String code = ownerOtpService.createVerificationCode(owner);
+      String code = ownerOtpService.reuseVerificationCode(owner);
       emailService.sendVerificationEmail(owner.getEmail(), buildVerificationLink(code));
     } catch (Exception ex) {
       log.warn(
