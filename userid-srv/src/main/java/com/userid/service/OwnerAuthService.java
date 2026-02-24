@@ -177,7 +177,7 @@ public class OwnerAuthService {
   }
 
   public OwnerSocialProviderConfigResponseDTO getSocialProviderConfig(AuthServerSocialProviderEnum provider) {
-    SocialProviderClientConfig config = socialProviderClientConfig(provider);
+    SocialProviderClientConfigDTO config = socialProviderClientConfig(provider);
     return new OwnerSocialProviderConfigResponseDTO(
         provider.pathValue(),
         config.isReady(),
