@@ -10,7 +10,6 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,7 +41,6 @@ class AuthServerApiClientTests {
         new AuthServerApiClient(
             restTemplate,
             properties,
-            new ObjectMapper().findAndRegisterModules(),
             new UseridApiMessageResolver(properties));
     server = MockRestServiceServer.bindTo(restTemplate).build();
   }

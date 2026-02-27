@@ -1,11 +1,9 @@
 package com.userid.api.client;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.web.client.RestTemplate;
 
 @AutoConfiguration
@@ -18,13 +16,7 @@ public class UseridApiAutoConfiguration {
       AuthServerApiProperties properties,
       UseridApiMessageResolver messageResolver
   ) {
-    ObjectMapper objectMapper = restTemplate.getMessageConverters().stream()
-        .filter(MappingJackson2HttpMessageConverter.class::isInstance)
-        .map(MappingJackson2HttpMessageConverter.class::cast)
-        .map(MappingJackson2HttpMessageConverter::getObjectMapper)
-        .findFirst()
-        .orElseGet(() -> new ObjectMapper().findAndRegisterModules());
-    return new AuthServerApiClient(restTemplate, properties, objectMapper, messageResolver);
+    return new AuthServerApiClient(restTemplate, properties, messageResolver);
   }
 
   @Bean
