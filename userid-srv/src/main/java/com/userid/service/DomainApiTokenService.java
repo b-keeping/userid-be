@@ -1,14 +1,8 @@
 package com.userid.service;
 
+import com.userid.api.client.DomainApiJwtTokenUtils;
 import com.userid.api.domain.DomainApiTokenResponseDTO;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.util.Date;
-import javax.crypto.SecretKey;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -28,22 +22,20 @@ public class DomainApiTokenService {
   }
 
   public DomainApiTokenResponseDTO generate(Long domainId, Long expiresSeconds) {
-    long seconds = expiresSeconds != null ? expiresSeconds : defaultSeconds;
-    if (seconds <= 0) {
+    long ttlSeconds = expiresSeconds != null ? expiresSeconds : defaultSeconds;
+    if (ttlSeconds <= 0) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "expiresSeconds must be positive");
     }
     String secret = domainJwtSecretService.getOrCreateSecret(domainId);
-    SecretKey secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
-    Instant now = Instant.now();
-    Instant exp = now.plusSeconds(seconds);
-    String token = Jwts.builder()
-        .subject("domain-api")
-        .claim("domainId", domainId)
-        .claim("type", "domain-api")
-        .issuedAt(Date.from(now))
-        .expiration(Date.from(exp))
-        .signWith(secretKey)
-        .compact();
-    return new DomainApiTokenResponseDTO(token, OffsetDateTime.ofInstant(exp, ZoneOffset.UTC));
+    try {
+      DomainApiJwtTokenUtils.DomainApiJwtToken token = DomainApiJwtTokenUtils.generate(
+          domainId,
+          secret,
+          ttlSeconds,
+          Instant.now());
+      return new DomainApiTokenResponseDTO(token.token(), token.expiresAt());
+    } catch (IllegalArgumentException ex) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
   }
 }
