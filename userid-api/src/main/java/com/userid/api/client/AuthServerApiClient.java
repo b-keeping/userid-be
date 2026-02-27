@@ -1,6 +1,5 @@
 package com.userid.api.client;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -25,7 +24,6 @@ public class AuthServerApiClient {
 
   private final RestTemplate restTemplate;
   private final AuthServerApiProperties properties;
-  private final ObjectMapper objectMapper;
   private final UseridApiMessageResolver messageResolver;
 
   public boolean isEnabled() {
@@ -448,15 +446,6 @@ public class AuthServerApiClient {
           properties.getDomainId(),
           ex.getMessage());
       throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Registration server is unavailable");
-    }
-  }
-
-  private String toJson(Object payload) {
-    try {
-      return objectMapper.writeValueAsString(payload);
-    } catch (JsonProcessingException ex) {
-      log.warn("Failed to serialize auth server payload", ex);
-      return "<serialization-error>";
     }
   }
 
