@@ -1,11 +1,11 @@
 package com.userid.service;
 
 import com.userid.api.common.ApiMessageDTO;
-import com.userid.api.user.UserAuthResponseDTO;
 import com.userid.api.user.UserConfirmRequestDTO;
 import com.userid.api.user.UserForgotPasswordRequestDTO;
 import com.userid.api.user.UserLoginRequestDTO;
 import com.userid.api.user.UserLoginResponseDTO;
+import com.userid.api.user.UserProfileValueResponseDTO;
 import com.userid.api.user.UserRegistrationRequestDTO;
 import com.userid.api.user.UserResetPasswordRequestDTO;
 import com.userid.api.user.UserResponseDTO;
@@ -20,6 +20,7 @@ import com.userid.api.client.EmailNormalizer;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -181,26 +182,36 @@ public class DomainUserAuthService {
     }
   }
 
-  private UserAuthResponseDTO toAuthResponse(UserEntity user) {
-    return new UserAuthResponseDTO(
+  private UserResponseDTO toAuthResponse(UserEntity user) {
+    return new UserResponseDTO(
         user.getId(),
         user.getDomain().getId(),
         user.getEmail(),
         user.getEmailVerifiedAt() != null,
         user.isActive(),
-        user.getCreatedAt()
+        user.getCreatedAt(),
+        resolveValues(user)
     );
   }
 
-  private UserAuthResponseDTO toAuthResponse(Long domainId, UserResponseDTO user) {
-    return new UserAuthResponseDTO(
+  private UserResponseDTO toAuthResponse(Long domainId, UserResponseDTO user) {
+    return new UserResponseDTO(
         user.id(),
         domainId,
         user.email(),
         user.confirmed(),
         user.active(),
-        user.createdAt()
+        user.createdAt(),
+        user.values()
     );
+  }
+
+  private List<UserProfileValueResponseDTO> resolveValues(UserEntity user) {
+    UserResponseDTO response = userService.toResponse(user);
+    if (response == null || response.values() == null) {
+      return List.of();
+    }
+    return response.values();
   }
 
   private String resolveVerificationEmail(UserEntity user) {

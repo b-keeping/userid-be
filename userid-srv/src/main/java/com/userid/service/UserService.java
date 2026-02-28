@@ -510,6 +510,7 @@ public class UserService {
     boolean confirmed = user.getEmailVerifiedAt() != null;
     return new UserResponseDTO(
         user.getId(),
+        user.getDomain().getId(),
         resolveDisplayedEmail(user),
         confirmed,
         user.isActive(),
@@ -539,7 +540,7 @@ public class UserService {
     return new UserProfileValueResponseDTO(
         field.getId(),
         field.getName(),
-        field.getType(),
+        field.getType() == null ? null : field.getType().name(),
         field.isMandatory(),
         stringValue,
         numericValue,

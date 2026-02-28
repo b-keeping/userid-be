@@ -5,6 +5,7 @@ import java.util.List;
 
 public record UserResponseDTO(
     Long id,
+    Long domainId,
     String email,
     boolean confirmed,
     boolean active,

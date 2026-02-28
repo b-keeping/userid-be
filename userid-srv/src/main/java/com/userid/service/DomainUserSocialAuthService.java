@@ -3,8 +3,9 @@ package com.userid.service;
 import com.userid.api.client.AuthServerSocialLoginRequestDTO;
 import com.userid.api.client.AuthServerSocialProviderEnum;
 import com.userid.api.client.SocialProviderOAuthClient;
-import com.userid.api.user.UserAuthResponseDTO;
 import com.userid.api.user.UserLoginResponseDTO;
+import com.userid.api.user.UserProfileValueResponseDTO;
+import com.userid.api.user.UserResponseDTO;
 import com.userid.dal.entity.DomainEntity;
 import com.userid.dal.entity.DomainSocialProviderConfigEntity;
 import com.userid.dal.entity.UserEntity;
@@ -16,6 +17,7 @@ import com.userid.dal.repo.UserSocialIdentityRepository;
 import com.userid.security.DomainUserJwtService;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +39,7 @@ public class DomainUserSocialAuthService {
   private final PasswordEncoder passwordEncoder;
   private final DomainUserJwtService domainUserJwtService;
   private final SocialProviderOAuthClient socialProviderOAuthClient;
+  private final UserService userService;
 
   public UserLoginResponseDTO login(
       Long domainId,
@@ -169,13 +172,22 @@ public class DomainUserSocialAuthService {
     identity.setProviderEmailVerified(socialPrincipal.emailVerified());
   }
 
-  private UserAuthResponseDTO toAuthResponse(UserEntity user) {
-    return new UserAuthResponseDTO(
+  private UserResponseDTO toAuthResponse(UserEntity user) {
+    return new UserResponseDTO(
         user.getId(),
         user.getDomain().getId(),
         user.getEmail(),
         user.getEmailVerifiedAt() != null,
         user.isActive(),
-        user.getCreatedAt());
+        user.getCreatedAt(),
+        resolveValues(user));
+  }
+
+  private List<UserProfileValueResponseDTO> resolveValues(UserEntity user) {
+    UserResponseDTO response = userService.toResponse(user);
+    if (response == null || response.values() == null) {
+      return List.of();
+    }
+    return response.values();
   }
 }
