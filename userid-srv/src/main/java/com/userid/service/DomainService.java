@@ -91,7 +91,7 @@ public class DomainService {
       }
       linkDomain(requester, saved);
     }
-    log.info("Domain ownership linked domainId={} ownerId={}", saved.getId(), requester.getRole() == OwnerRoleEnum.ADMIN ? owner.getId() : requester.getId());
+    log.info("Domain ownership linked domainId={} ownerId={}", saved.getId(), requester.getRole() == OwnerRoleEnum.ADMIN ? owner==null?null:owner.getId() : requester.getId());
     populateDns(saved, false);
     log.info("Domain DNS populated domainId={}", saved.getId());
     return toResponse(domainRepository.save(saved));
