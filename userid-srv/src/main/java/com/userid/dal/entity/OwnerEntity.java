@@ -24,7 +24,7 @@ import org.hibernate.annotations.ColumnDefault;
 
 @Entity
 @Table(
-    name = "owners",
+    name = "owner",
     uniqueConstraints = {
       @UniqueConstraint(name = "uk_owners_email", columnNames = {"email"})
     },

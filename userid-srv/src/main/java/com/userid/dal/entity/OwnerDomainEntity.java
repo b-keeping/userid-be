@@ -20,7 +20,7 @@ import lombok.Setter;
 
 @Entity
 @Table(
-    name = "owner_domains",
+    name = "owner_domain",
     uniqueConstraints = {
       @UniqueConstraint(name = "uk_owner_domains_owner_domain", columnNames = {"owner_id", "domain_id"}),
       @UniqueConstraint(name = "uk_owner_domains_domain", columnNames = {"domain_id"})

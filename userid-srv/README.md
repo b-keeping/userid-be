@@ -6,12 +6,12 @@ Auth service for domain-based user registration with dynamic profile fields.
 
 ```mermaid
 erDiagram
-  domains {
+  domain {
     bigint id PK
     varchar name
   }
 
-  profile_fields {
+  profile_field {
     bigint id PK
     bigint domain_id FK
     varchar name
@@ -29,7 +29,7 @@ erDiagram
     jsonb profile_jsonb
   }
 
-  owners {
+  owner {
     bigint id PK
     varchar username "unique"
     varchar password_hash
@@ -37,14 +37,14 @@ erDiagram
     timestamptz created_at
   }
 
-  owner_domains {
+  owner_domain {
     bigint id PK
     bigint owner_id FK
     bigint domain_id FK
     timestamptz created_at
   }
 
-  user_profile_values {
+  user_profile_value {
     bigint id PK
     bigint user_id FK
     bigint field_id FK
@@ -57,19 +57,19 @@ erDiagram
     timestamptz value_timestamp
   }
 
-  domains ||--o{ profile_fields : has
-  domains ||--o{ users : has
-  users ||--o{ user_profile_values : has
-  profile_fields ||--o{ user_profile_values : uses
-  owners ||--o{ owner_domains : links
-  domains ||--o{ owner_domains : links
+  domain ||--o{ profile_field : has
+  domain ||--o{ users : has
+  users ||--o{ user_profile_value : has
+  profile_field ||--o{ user_profile_value : uses
+  owner ||--o{ owner_domain : links
+  domain ||--o{ owner_domain : links
 ```
 
 ### Indexes (core for fast fetch)
-- `profile_fields (domain_id, name)` unique for schema lookup by domain.
+- `profile_field (domain_id, name)` unique for schema lookup by domain.
 - `users (domain_id, login)` unique for user lookup per domain.
-- `user_profile_values (user_id)` for fast fetch of user profile.
-- `user_profile_values (field_id, value_*)` per-type composite indexes for fast filtering.
+- `user_profile_value (user_id)` for fast fetch of user profile.
+- `user_profile_value (field_id, value_*)` per-type composite indexes for fast filtering.
 
 ## API
 

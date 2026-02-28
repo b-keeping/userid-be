@@ -21,7 +21,7 @@ import lombok.Setter;
 
 @Entity
 @Table(
-    name = "profile_fields",
+    name = "profile_field",
     uniqueConstraints = {
       @UniqueConstraint(
           name = "uk_profile_fields_domain_name",

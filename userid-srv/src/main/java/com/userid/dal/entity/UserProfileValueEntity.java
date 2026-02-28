@@ -23,7 +23,7 @@ import lombok.Setter;
 
 @Entity
 @Table(
-    name = "user_profile_values",
+    name = "user_profile_value",
     uniqueConstraints = {
       @UniqueConstraint(name = "uk_user_profile_values_user_field", columnNames = {"user_id", "field_id"})
     },

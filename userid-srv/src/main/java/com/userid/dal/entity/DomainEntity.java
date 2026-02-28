@@ -17,7 +17,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "domains")
+@Table(name = "domain")
 @Getter
 @Setter
 @NoArgsConstructor

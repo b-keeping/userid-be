@@ -25,7 +25,7 @@ import lombok.Setter;
 
 @Entity
 @Table(
-    name = "owner_social_identities",
+    name = "owner_social_identity",
     uniqueConstraints = {
       @UniqueConstraint(
           name = "uk_owner_social_identity_provider_subject",
