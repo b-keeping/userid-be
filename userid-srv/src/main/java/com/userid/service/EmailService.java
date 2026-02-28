@@ -24,7 +24,6 @@ public class EmailService {
   private final String smtpProtocol;
   private final String smtpDefaultEncoding;
   private final String smtpUsername;
-  private final String smtpPassword;
   private final boolean smtpAuth;
   private final boolean smtpStartTls;
   private final String domainFromLocalPart;
@@ -55,7 +54,6 @@ public class EmailService {
     this.smtpProtocol = smtpProtocol;
     this.smtpDefaultEncoding = smtpDefaultEncoding;
     this.smtpUsername = smtpUsername;
-    this.smtpPassword = smtpPassword;
     this.smtpAuth = smtpAuth;
     this.smtpStartTls = smtpStartTls;
     this.domainFromLocalPart = domainFromLocalPart;

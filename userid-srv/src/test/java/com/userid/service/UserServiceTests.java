@@ -77,6 +77,7 @@ class UserServiceTests {
         .passwordHash("old-hash")
         .createdAt(java.time.OffsetDateTime.now())
         .emailVerifiedAt(java.time.OffsetDateTime.now())
+        .active(true)
         .build();
 
     when(domainRepository.findById(12L)).thenReturn(Optional.of(domain));

@@ -93,6 +93,7 @@ class AuthServerApiClientTests {
                 "id": 101,
                 "email": "user@example.org",
                 "confirmed": true,
+                "active": true,
                 "domainId": 5
               }
             }
@@ -108,6 +109,7 @@ class AuthServerApiClientTests {
     assertThat(response.user().id()).isEqualTo(101L);
     assertThat(response.user().email()).isEqualTo("user@example.org");
     assertThat(response.user().confirmed()).isTrue();
+    assertThat(response.user().active()).isTrue();
     assertThat(response.user().domainId()).isEqualTo(5L);
   }
 
